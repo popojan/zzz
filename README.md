@@ -19,15 +19,15 @@ in comparison with k=0 (basic ProductLog approximation)
 
 ![errors](doc/errors.png)
 
-```bash
-$ time ./zzz 10000000000000000000001 0 0.1 10000
-```
-
 # Approximate n-th zero locations
 
 ## Zero # 10^22 + 1
 
 see [~odlyzko/zeta_tables/zeros5](https://www-users.cse.umn.edu/~odlyzko/zeta_tables/zeros5)
+
+```bash
+$ time ./zzz 10000000000000000000001 0 0.1 10000
+```
 
 ```text
 zero counting function lower bound lo_t = 10000000000000000000001.492 +/- 3.3661e-53
@@ -49,7 +49,9 @@ sys	0m0.003s
 
 ## Zero # 10^100
 
-```$ time ./zzz 1e100 0 0.1 10000 1024 64 | tail -n1```
+```bash
+$ time ./zzz 1e100 0 0.1 10000 1024 64 | tail -n1
+```
 
 ```text
 280690383842894069903195445838256400084548030162846045192360059224930922349073043060335653109252473.2500
