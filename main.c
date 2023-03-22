@@ -241,8 +241,8 @@ int main(int argc, char *argv[])
     DIGITS += arf_get_si(&u->mid, 0);
 
     arb_set_d(m, -0.5);
+    nt_inv(tt, m0);
     arb_add(m, m0, m, PREC);
-    nt_inv(tt, m);
     arb_set(m_lo, m);
     arb_set(m_hi, m);
 
