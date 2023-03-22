@@ -11,7 +11,7 @@ void zeta(acb_ptr out, arb_t t) {
     acb_init(z);
     arb_t a;
     arb_init(a);
-    arb_set_str(a, "0.5", PREC);
+    arb_set_d(a, 0.5);
     acb_set_arb_arb(s, a, t);
     acb_zeta(z, s, ZETA_PREC);
     acb_set(out, z);
@@ -26,7 +26,7 @@ void nt(arb_ptr out, arb_t t) {
     arb_init(b);
 
     arb_set(x, t);
-    arb_set_str(a, "2.0", PREC);
+    arb_set_d(a, 2.0);
     arb_const_pi(b, PREC);
     arb_div(x, x, a, PREC);
     arb_div(x, x, b, PREC);
@@ -35,8 +35,8 @@ void nt(arb_ptr out, arb_t t) {
     arb_div(a, a, b, PREC);
     arb_log(a, a, PREC);
     arb_mul(x, a, x, PREC);
-    arb_set_str(a, "7.0", PREC);
-    arb_set_str(b, "8.0", PREC);
+    arb_set_d(a, 7.0);
+    arb_set_d(b, 8.0);
     arb_div(a, a, b, PREC);
     arb_add(x, x, a, PREC);
     arb_set(out, x);
@@ -55,9 +55,9 @@ void nt_inv(arb_ptr out, arb_t m) {
     arb_init(den);
     arb_init(nom);
 
-    arb_set_str(x, "8.0", PREC);
+    arb_set_d(x, 8.0);
     arb_mul(x, x, m, PREC);
-    arb_set_str(a, "11.0", PREC);
+    arb_set_d(a, 11.0);
     arb_sub(x, x, a, PREC);
 
     arb_set(nom, x);
@@ -67,10 +67,10 @@ void nt_inv(arb_ptr out, arb_t m) {
     arb_set(den, x);
     arb_const_e(b, PREC);
     arb_div(den, den, b, PREC);
-    arb_set_str(b, "8.0", PREC);
+    arb_set_d(b, 8.0);
     arb_div(den, den, b, PREC);
     arb_lambertw( den, den, 0, PREC);
-    arb_set_str(b, "4.0", PREC);
+    arb_set_d(b, 4.0);
     arb_mul(den, den, b, PREC);
 
     arb_set(x, nom);
@@ -107,7 +107,7 @@ void pw(arb_ptr out, arb_t q, arb_t t) {
     arb_sub(x, x, t, PREC);
 
     //Mod[-t + PI / Log[q], 2 PI / Log[q]]
-    arb_set_str(b, "2.0", PREC);
+    arb_set_d(b, 2.0);
     arb_set(a, pi_div_log_q);
     arb_mul(a, a, b, PREC);
     arb_div(b, x, a, PREC);
@@ -127,21 +127,21 @@ void pw(arb_ptr out, arb_t q, arb_t t) {
     arb_log(b, b, PREC);
     arb_mul(b, b, sqrt_q, PREC);
     arb_div(b, b, pi, PREC);
-    arb_set_str(a, "4.0", PREC);
+    arb_set_d(a, 4.0);
     arb_mul(b, b, a, PREC);
     arb_mul(x, x, b, PREC);
 
     // Sqrt((Sqrt(q)-1)^2 + 4/PI) ...
     arb_set(b, sqrt_q);
-    arb_set_str(a, "-1.0", PREC);
+    arb_set_d(a, -1.0);
     arb_add(b, b, a, PREC);
     arb_mul(b, b, b, PREC);
     arb_add(x, x, b, PREC);
     arb_sqrt(x, x, PREC);
 
     //(sqrt(q)-1-#)((sqrt(q)+1-#))&@ ...
-    arb_set_str(a, "-1.0", PREC);
-    arb_set_str(b, "1.0", PREC);
+    arb_set_d(a, -1.0);
+    arb_one(b);
     arb_add(a, a, sqrt_q, PREC);
     arb_add(b, b, sqrt_q, PREC);
     arb_sub(a, a, x, PREC);
