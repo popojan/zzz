@@ -256,7 +256,6 @@ int main(int argc, char *argv[])
     arb_init(hi_t);
 
     arb_set_d(lo, step0);
-    arb_neg(lo, lo);
     arb_set_d(hi, 0.5);
     arb_mul(lo, lo, hi, PREC);
     arb_sub(tt, tt, lo, PREC);
