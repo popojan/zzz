@@ -193,9 +193,9 @@ int main(int argc, char *argv[])
         flint_printf("    off       ... (n+off)-th zeta zero on critical line calculation [default 0]\n");
         flint_printf("    eval      ... evaluate Riemann zeta function value at the approximate zero location [default 1]\n");
         flint_printf("    step      ... heuristic width (0.0, 0.25> [default 0.1]\n");
-        flint_printf("    PREC      ... arb precision for counting functiom approximation [default 256]\n");
+        flint_printf("    PREC      ... arb precision for counting function approximation [default 256]\n");
         flint_printf("    ZETA_PREC ... arb precision for zeta evaluation [default 64]\n");
-        flint_printf("    DIGITS    ... extra decimal digits for number formating [default 4]\n");
+        flint_printf("    DIGITS    ... extra decimal digits for number formatting [default 4]\n");
         return 1;
     }
 
@@ -241,8 +241,8 @@ int main(int argc, char *argv[])
     DIGITS += arf_get_si(&u->mid, 0);
 
     arb_set_d(m, -0.5);
-    nt_inv(tt, m0);
     arb_add(m, m0, m, PREC);
+    nt_inv(tt, m);
     arb_set(m_lo, m);
     arb_set(m_hi, m);
 
