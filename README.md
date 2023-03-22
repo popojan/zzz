@@ -50,7 +50,7 @@ sys	0m0.003s
 ## Zero # 10^100
 
 ```bash
-$ time ./zzz 1e100 0 +0 0.1 10000 1024 64 | tail -n1
+$ time ./zzz 1e100 +0 0 0.1 10000 1024 64 | tail -n1
 ```
 
 ```text
