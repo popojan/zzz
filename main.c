@@ -186,11 +186,11 @@ void zest(arb_ptr out, arb_t t, slong k) {
 int main(int argc, char *argv[])
 {
 
-    if (argc < 3)
+    if (argc < 2)
     {
-        flint_printf("zzz n off [[[[[[eval] step] k] PREC] ZETA_PREC] DIGITS]\n");
+        flint_printf("zzz n [off [eval [step [k [PREC [ZETA_PREC [DIGITS]]]]]]]\n");
         flint_printf("    n         ... (n+off)-th zeta zero on critical line calculation [obligatory]\n");
-        flint_printf("    off       ... (n+off)-th zeta zero on critical line calculation [obligatory]\n");
+        flint_printf("    off       ... (n+off)-th zeta zero on critical line calculation [default 0]\n");
         flint_printf("    eval      ... evaluate Riemann zeta function value at the approximate zero location [default 1]\n");
         flint_printf("    step      ... heuristic width (0.0, 0.25> [default 0.1]\n");
         flint_printf("    PREC      ... arb precision for counting functiom approximation [default 256]\n");
@@ -201,8 +201,12 @@ int main(int argc, char *argv[])
 
     slong k = 2;
     double step0 = 0.1;
-    slong ai = 3;
+    slong ai = 2;
     slong eval = 1;
+    arb_t m;
+    arb_init(m);
+
+    if (argc > ai) arb_set_str(m, argv[ai++], PREC);
     if (argc > ai) eval = atol(argv[ai++]);
     if (argc > ai) step0 = atof(argv[ai++]);
     if (argc > ai) k = atol(argv[ai++]);
@@ -213,7 +217,6 @@ int main(int argc, char *argv[])
     n_compute_primes(k);
 
     arb_t u;
-    arb_t m;
     arb_t m0;
     arb_t m_lo;
     arb_t m_hi;
@@ -221,7 +224,6 @@ int main(int argc, char *argv[])
     arb_t step;
 
     arb_init(u);
-    arb_init(m);
     arb_init(m0);
     arb_init(m_lo);
     arb_init(m_hi);
@@ -229,7 +231,6 @@ int main(int argc, char *argv[])
     arb_init(step);
 
     arb_set_str(m0, argv[1], PREC);
-    arb_set_str(m, argv[2], PREC);
     arb_add(m0, m0, m, PREC);
 
     arb_const_log10(u, PREC);
