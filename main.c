@@ -76,9 +76,6 @@ void nt_inv(arb_ptr out, arb_t m) {
     arb_set(x, nom);
     arb_div(x, x, den, PREC);
 
-    //arb_set_d(b, -0.5);
-    //arb_add(x, x, b, PREC);
-
     arb_set(out, x);
 }
 void pw(arb_ptr out, arb_t q, arb_t t) {
@@ -177,7 +174,6 @@ void zest(arb_ptr out, arb_t t, slong k) {
     arb_sub(u, u, u, PREC);
     for(int i = 1; i <= k; ++i) {
         arb_set_d(q, n_nth_prime(i));
-        //arb_printd(q, DIGITS);
         pw(w, q, t);
         arb_add(u, u, w, PREC);
     }
@@ -190,10 +186,11 @@ void zest(arb_ptr out, arb_t t, slong k) {
 int main(int argc, char *argv[])
 {
 
-    if (argc < 2)
+    if (argc < 3)
     {
-        flint_printf("zzz n [[[[[[eval] step] k] PREC] ZETA_PREC] DIGITS]\n");
-        flint_printf("    n         ... n-th zeta zero on critical line calculation [obligatory]\n");
+        flint_printf("zzz n off [[[[[[eval] step] k] PREC] ZETA_PREC] DIGITS]\n");
+        flint_printf("    n         ... (n+off)-th zeta zero on critical line calculation [obligatory]\n");
+        flint_printf("    off       ... (n+off)-th zeta zero on critical line calculation [obligatory]\n");
         flint_printf("    eval      ... evaluate Riemann zeta function value at the approximate zero location [default 1]\n");
         flint_printf("    step      ... heuristic width (0.0, 0.25> [default 0.1]\n");
         flint_printf("    PREC      ... arb precision for counting functiom approximation [default 256]\n");
@@ -204,7 +201,7 @@ int main(int argc, char *argv[])
 
     slong k = 2;
     double step0 = 0.1;
-    slong ai = 2;
+    slong ai = 3;
     slong eval = 1;
     if (argc > ai) eval = atol(argv[ai++]);
     if (argc > ai) step0 = atof(argv[ai++]);
@@ -232,6 +229,9 @@ int main(int argc, char *argv[])
     arb_init(step);
 
     arb_set_str(m0, argv[1], PREC);
+    arb_set_str(m, argv[2], PREC);
+    arb_add(m0, m0, m, PREC);
+
     arb_const_log10(u, PREC);
     arb_inv(u, u, PREC);
     arb_log(m, m0, PREC);

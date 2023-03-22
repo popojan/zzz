@@ -26,7 +26,7 @@ in comparison with k=0 (basic ProductLog approximation)
 see [~odlyzko/zeta_tables/zeros5](https://www-users.cse.umn.edu/~odlyzko/zeta_tables/zeros5)
 
 ```bash
-$ time ./zzz 10000000000000000000001 0 0.1 10000
+$ time ./zzz 1e22 +1 0 0.1 10000
 ```
 
 ```text
@@ -50,7 +50,7 @@ sys	0m0.003s
 ## Zero # 10^100
 
 ```bash
-$ time ./zzz 1e100 0 0.1 10000 1024 64 | tail -n1
+$ time ./zzz 1e100 0 +0 0.1 10000 1024 64 | tail -n1
 ```
 
 ```text
