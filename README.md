@@ -60,3 +60,12 @@ real	0m0.344s
 user	0m0.329s
 sys	0m0.014s
 ```
+
+# Literature
+
+* Bernhard Riemann: *On the Number of Prime Numbers less than a Given Quantity*.
+  * https://www.claymath.org/sites/default/files/ezeta.pdf
+* Jonathan W. Bober, Ghaith A. Hiary: *New computations of the Riemann zeta function on the critical line*
+  * https://arxiv.org/abs/1607.00709
+* M. V. Berry, J. P. Keating: *The Riemann Zeros and Eigenvalue Asymptotics*
+  * https://empslocal.ex.ac.uk/people/staff/mrwatkin/zeta/berry-keating1.pdf
