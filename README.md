@@ -4,8 +4,9 @@ fast approximate location of large Riemann zeta zeros on the critical line
 ```text
 zzz n [off [eval [step [k [PREC [ZETA_PREC [DIGITS]]]]]]]
     n         ... (n+off)-th zeta zero on critical line calculation [obligatory]
+    k         ... use first k primes for zero counting function approximation [default 2]
     off       ... (n+off)-th zeta zero on critical line calculation [default 0]
-    eval      ... evaluate Riemann zeta function value at the approximate zero location [default 1]
+    eval      ... evaluate Riemann zeta function at the approximate zero location [default 1]
     step      ... heuristic width (0.0, 0.25> [default 0.1]
     PREC      ... arb precision for counting function approximation [default 256]
     ZETA_PREC ... arb precision for zeta evaluation [default 64]
