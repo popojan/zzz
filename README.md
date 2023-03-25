@@ -13,6 +13,7 @@ fast approximation of large Riemann zeta zeros
   -p, --precision=PREC       arb precision for counting function approximation
                              [default 256]
   -t, --tolerance=TOL        tolerance for bisection [default 0.5]
+  -v, --verbose              verbose progress output
   -w, --window=WIN           initial span around Lambert W asymptotic zero
                              location +- WIN [default 1.5]
   -z, --zeta-prec=ZETA_PREC  arb precision for zeta evaluation [default 64]
@@ -42,54 +43,44 @@ in comparison with k=0 (basic ProductLog approximation)
 
 # Approximate n-th zero locations
 
-## Zero # 10^22 + 1
+## Zero # 10^12 + 1
 
-see [~odlyzko/zeta_tables/zeros5](https://www-users.cse.umn.edu/~odlyzko/zeta_tables/zeros5)
+see [~odlyzko/zeta_tables/zeros5](https://www-users.cse.umn.edu/~odlyzko/zeta_tables/zeros3)
 
 ```bash
-$ time ./zzz -k 10000 1e22 +1
+$time ./zzz -e -k 1000 1e12 +1
 ```
 
-```text
-...
-zeta zero imaginary part lower approximation lo_t = 1370919909931995308226.6948 +/- 5.9440e-56
-zeta zero imaginary part upper approximation hi_t = 1370919909931995308226.6955 +/- 5.9440e-56
+```
+argument s = 	(0.5000000000000000 + 267653395648.8477j)  +/-  (0, 1.05e-65j)
+value    z = 	(-0.01633683696845106 - 0.005421210637911910j)  +/-  (1.17e-20, 1.05e-20j)
+267653395648.8477
 
-zero counting function lower bound lo = 10000000000000000000000.499 +/- 8.7894e-51
-zero counting function upper bound hi = 10000000000000000000000.506 +/- 8.7894e-51
-
-zeta zero imaginary part lower approximation lo_t = 1370919909931995308226.6948 +/- 5.9440e-56
-zeta zero imaginary part upper approximation hi_t = 1370919909931995308226.6955 +/- 5.9440e-56
-
-(0.50000000000000000000000000 + 1370919909931995308226.6952j)  +/-  (0, 5.94e-56j)
-
-
-To be refined.
-
-1370919909931995308226.6952
-
-real	0m2.600s
-user	0m2.585s
-sys	0m0.003s
+real	0m0.270s
+user	0m0.264s
+sys	0m0.005s
 ```
 
 ## Zero # 10^36 + 42420637374017961984
 
 ```bash
-$ time ./zzz -k 100000 1e36 42420637374017961984 | tail -n1
+$ time ./zzz -k 10000 1e36 42420637374017961984
+```
 
-81029194732694548890047854481676713.01539
+```text
+argument s = 	(0.5000000000000000000000000000000000000000 + 81029194732694548890047854481676713.01026j)  +/-  (0, 3.53e-42j)
+81029194732694548890047854481676713.01026
 
-real	0m22.716s
-user	0m22.541s
-sys	0m0.002s
+real	0m2.096s
+user	0m2.083s
+sys	0m0.003s
 ```
 
 ```
 81029194732694548890047854481676712.93997   prev approximate     #10^36+42420637374017961983
 81029194732694548890047854481676712.98790          published     #10^36+42420637374017961984
-81029194732694548890047854481676713.01539        approximate     #10^36+42420637374017961984
-81029194732694548890047854481676713.09538   next approximate     #10^36+42420637374017961985
+81029194732694548890047854481676713.01026        approximate     #10^36+42420637374017961984
+81029194732694548890047854481676713.08806   next approximate     #10^36+42420637374017961985
 ```
 
 
