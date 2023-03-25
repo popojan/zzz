@@ -28,9 +28,15 @@ Combines quadratic and cubic spline with correct frequency and tangents to match
 
 ![waves](doc/waves.png)
 
+## Towards convergence
+
+Error bounds derived from sum of exact saw peaks.
+
+![waves](doc/convergence.png)
+
 ## Error distribution
 
-in comparison with k=0 (basic ProductLog approximation)
+In comparison with k=0 (basic Lambert W approximation).
 
 ![errors](doc/errors.png)
 
