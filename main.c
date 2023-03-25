@@ -436,6 +436,7 @@ static struct argp_option options[] = {
         { "precision", 'p', "PREC", 0, "arb precision for counting function approximation [default 256]"},
         { "zeta-prec", 'z', "ZETA_PREC", 0, "arb precision for zeta evaluation [default 64]"},
         { "digits", 'd', "DIGITS", 0, "extra digits for number formatting [default 4]"},
+        { "verbose", 'v', 0, 0, "verbose progress output"},
         { 0 }
 };
 
@@ -447,6 +448,7 @@ struct arguments {
     slong PREC;
     slong ZETA_PREC;
     slong DIGITS;
+    slong verbose;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -460,6 +462,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 'p': arguments->PREC = atol(arg); break;
         case 'z': arguments->ZETA_PREC = atol(arg); break;
         case 'd': arguments->DIGITS = atol(arg); break;
+        case 'v': arguments->verbose = 1; break;
         case ARGP_KEY_ARG: return 0;
         default: return ARGP_ERR_UNKNOWN;
     }
@@ -468,6 +471,22 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 
 static struct argp argp = { options, parse_opt, args_doc, doc, 0, 0, 0 };
 
+void iter_print(arb_ptr lo_t, arb_ptr lo, arb_ptr hi_t, arb_ptr hi, slong DIGITS, slong verbose) {
+
+    if(verbose == 0) return;
+
+    flint_printf("lower x N(x)\t");
+    arb_printd(lo, DIGITS);
+    flint_printf("\t");
+    arb_printd(lo_t, DIGITS);
+    flint_printf("\n");
+
+    flint_printf("upper x N(x)\t");
+    arb_printd(hi, DIGITS);
+    flint_printf("\t");
+    arb_printd(hi_t, DIGITS);
+    flint_printf("\n");
+}
 int main(int argc, char *argv[])
 {
 
@@ -485,6 +504,7 @@ int main(int argc, char *argv[])
     arguments.step0 = 0.01;
     arguments.w0 = 1.5;
     arguments.eval = 0;
+    arguments.verbose = 0;
 
     int arg_index = 1;
     argp_parse(&argp, argc, argv, ARGP_NO_ARGS, &arg_index, &arguments);
@@ -556,21 +576,10 @@ int main(int argc, char *argv[])
     zero_count_approx(lo, lo_t, arguments.k, arguments.PREC);
     zero_count_approx(hi, hi_t, arguments.k, arguments.PREC);
 
-    flint_printf("zero counting function lower bound lo = ");
-    arb_printd(lo, arguments.DIGITS);
-    flint_printf("\n");
-    flint_printf("zero counting function upper bound hi = ");
-    arb_printd(hi, arguments.DIGITS);
-    flint_printf("\n\n");
-
-    flint_printf("zeta zero imaginary part lower approximation lo_t = ");
-    arb_printd(lo_t, arguments.DIGITS);
-    flint_printf("\n");
-    flint_printf("zeta zero imaginary part upper approximation hi_t = ");
-    arb_printd(hi_t, arguments.DIGITS);
-    flint_printf("\n\n");
-
     if( arb_gt(lo, m) || arb_lt(hi, m) || arb_lt(hi, lo)) {
+
+        iter_print(lo_t, lo, hi_t, hi, arguments.DIGITS, arguments.verbose);
+
         flint_printf("please increase the window\n");
         return 0;
     }
@@ -582,19 +591,7 @@ int main(int argc, char *argv[])
 
     while(1) {
 
-        flint_printf("zero counting function lower bound lo = ");
-        arb_printd(lo, arguments.DIGITS);
-        flint_printf("\n");
-        flint_printf("zero counting function upper bound hi = ");
-        arb_printd(hi, arguments.DIGITS);
-        flint_printf("\n\n");
-
-        flint_printf("zeta zero imaginary part lower approximation lo_t = ");
-        arb_printd(lo_t, arguments.DIGITS);
-        flint_printf("\n");
-        flint_printf("zeta zero imaginary part upper approximation hi_t = ");
-        arb_printd(hi_t, arguments.DIGITS);
-        flint_printf("\n\n");
+        iter_print(lo_t, lo, hi_t, hi, arguments.DIGITS, arguments.verbose);
 
         arb_add(mid_t, lo_t, hi_t, arguments.PREC);
         arb_set_d(m0, 0.5);
@@ -617,33 +614,22 @@ int main(int argc, char *argv[])
         }
     }
 
-    flint_printf("zero counting function lower bound lo = ");
-    arb_printd(lo, arguments.DIGITS);
-    flint_printf("\n");
-    flint_printf("zero counting function upper bound hi = ");
-    arb_printd(hi, arguments.DIGITS);
-    flint_printf("\n\n");
+    iter_print(lo_t, lo, hi_t, hi, arguments.DIGITS, arguments.verbose);
 
-    flint_printf("zeta zero imaginary part lower approximation lo_t = ");
-    arb_printd(lo_t, arguments.DIGITS);
-    flint_printf("\n");
-    flint_printf("zeta zero imaginary part upper approximation hi_t = ");
-    arb_printd(hi_t, arguments.DIGITS);
-    flint_printf("\n\n");
-
+    flint_printf("argument s = \t");
     arb_set_d(lo_t, 0.5);
     acb_set_arb_arb(zz, lo_t, mid_t);
     acb_printd(zz, arguments.DIGITS);
     flint_printf("\n");
+
     if(arguments.eval > 0) {
-        flint_printf("\nRiemann zeta value    z = ");
+        flint_printf("value    z = \t");
         zeta(zz, mid_t, arguments.ZETA_PREC);
         acb_printd(zz, arguments.DIGITS);
+        flint_printf("\n");
     }
-    flint_printf("\n");
     arb_set_d(lo_t, 0.005);
 
-    flint_printf("\nTo be refined.\n\n");
     arf_printd(&mid_t->mid, arguments.DIGITS);
     flint_printf("\n");
 
