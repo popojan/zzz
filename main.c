@@ -1,12 +1,9 @@
 #include "acb.h"
-
-slong PREC = 256;
-slong ZETA_PREC = 64;
-slong DIGITS = 4;
+#include <argp.h>
 
 #define CUBIC 1
 
-void coord(arb_ptr out, arb_t q, arb_t t) {
+void coord(arb_ptr out, arb_t q, arb_t t, slong PREC) {
     arb_t pi;
     arb_t pi_div_log_q;
     arb_t x;
@@ -49,7 +46,7 @@ void coord(arb_ptr out, arb_t q, arb_t t) {
     arb_clear(b);
 }
 
-void wave2(arb_ptr out, arb_t q, arb_t t) {
+void wave2(arb_ptr out, arb_t q, arb_t t, slong PREC) {
     arb_t pi;
     arb_t sqrt_q;
     arb_t log_q;
@@ -120,7 +117,7 @@ void wave2(arb_ptr out, arb_t q, arb_t t) {
 }
 
 
-void wave3(arb_ptr out, arb_t q, arb_t t) {
+void wave3(arb_ptr out, arb_t q, arb_t t, slong PREC) {
     arb_t pi;
     arb_t sqrt_q;
     arb_t sqrt_q3;
@@ -192,7 +189,7 @@ void wave3(arb_ptr out, arb_t q, arb_t t) {
     arb_mul(b, q, q, PREC);
     arb_div(a, a, b, PREC);
     arb_sqrt(a, a, PREC);
-     //a == sqrt(numerator / q^2)
+    //a == sqrt(numerator / q^2)
 
     arb_set_d(b, 4.0);
     arb_mul(c, t, log_q, PREC);
@@ -259,7 +256,6 @@ void wave3(arb_ptr out, arb_t q, arb_t t) {
     arb_pow(b, q, b, PREC);
     arb_mul(y, y, b, PREC);
     arb_div(x, x, y, PREC);
-    
     arb_set(out, x);
 
     arb_clear(pi);
@@ -272,10 +268,9 @@ void wave3(arb_ptr out, arb_t q, arb_t t) {
     arb_clear(sqrt_q);
     arb_clear(sqrt_q3);
     arb_clear(log_q);
-    
 }
 
-void zeta(acb_ptr out, arb_t t) {
+void zeta(acb_ptr out, arb_t t, slong ZETA_PREC) {
     acb_t s;
     acb_t z;
     acb_init(s);
@@ -285,14 +280,13 @@ void zeta(acb_ptr out, arb_t t) {
     arb_set_d(a, 0.5);
     acb_set_arb_arb(s, a, t);
     acb_zeta(z, s, ZETA_PREC);
- 
     acb_set(out, z);
 
     acb_clear(s);
     acb_clear(z);
 }
 
-void nt(arb_ptr out, arb_t t) {
+void nt(arb_ptr out, arb_t t, slong PREC) {
     arb_t x;
     arb_t a;
     arb_t b;
@@ -314,15 +308,14 @@ void nt(arb_ptr out, arb_t t) {
     arb_set_d(b, 8.0);
     arb_div(a, a, b, PREC);
     arb_add(x, x, a, PREC);
-    
     arb_set(out, x);
-    
+
     arb_clear(x);
     arb_clear(a);
     arb_clear(b);
 }
 
-void nt_inv(arb_ptr out, arb_t m) {
+void nt_inv(arb_ptr out, arb_t m, slong PREC) {
     arb_t x;
     arb_t a;
     arb_t b;
@@ -364,7 +357,7 @@ void nt_inv(arb_ptr out, arb_t m) {
     arb_clear(nom);
 }
 
-void zero_count_approx(arb_ptr out, arb_t t, slong k) {
+void zero_count_approx(arb_ptr out, arb_t t, slong k, slong PREC) {
     arb_t u;
     arb_t w;
     arb_t q;
@@ -383,36 +376,38 @@ void zero_count_approx(arb_ptr out, arb_t t, slong k) {
     arb_init(s);
     arb_init(x);
 
-    nt(u, t);
+    nt(u, t, PREC);
 
     for(int i = 1; i <= k; ++i) {
         arb_set_d(q, n_nth_prime(i));
-        coord(x, q, t);
+        coord(x, q, t, PREC);
         arb_abs(w, x);
 
-        wave2(z, q, w);
+        wave2(z, q, w, PREC);
         if(arb_is_negative(x)) {
             arb_neg(z, z);
         }
 #if CUBIC == 1
-        arb_one(y);
+        arb_set_d(v, 2.0);
+        arb_sqrt(v, v, PREC);
+        arb_inv(v, v, PREC);
+        arb_set_d(y, i);
+        arb_pow(y, y, v, PREC);
         arb_set_d(v, 3.0);
-        arb_div(y, y, v, PREC);
-        arb_pow(y, q, y, PREC);
-        arb_set_d(v, 0.4);
-        arb_div(v, v, y, PREC);
+        arb_mul(y, y, v, PREC);
+        arb_inv(v, y, PREC);
+
         arb_set_d(y, 0.5);
         arb_sub(y, y, v, PREC);
         arb_mul(z, z, y, PREC);
         arb_add(u, u, z, PREC);
 
-        wave3(z, q, w);
+        wave3(z, q, w, PREC);
         if(arb_is_negative(x)) {
             arb_neg(z, z);
         }
         arb_set_d(y, 0.5);
         arb_add(y, y, v, PREC);
-
         arb_mul(z, z, y, PREC);
 #endif
         arb_add(u, u, z, PREC);
@@ -428,38 +423,77 @@ void zero_count_approx(arb_ptr out, arb_t t, slong k) {
     arb_clear(s);
     arb_clear(x);
 }
+
+const char *argp_program_version = "zzz 0";
+const char *argp_program_bug_address = "<>";
+static char doc[] = "fast approximation of large Riemann zeta zeros";
+static char args_doc[] = "N [offset]";
+static struct argp_option options[] = {
+        { "k", 'k', "K", 0, "use first k primes for zero counting function approximation [default 100]"},
+        { "evaluate", 'e', 0, 0, "evaluate Riemann zeta function value at the approximate zero location"},
+        { "tolerance", 't', "TOL", 0, "tolerance for bisection [default 0.5]"},
+        { "window", 'w', "WIN", 0, "initial span around Lambert W asymptotic zero location +- WIN [default 1.5]"},
+        { "precision", 'p', "PREC", 0, "arb precision for counting function approximation [default 256]"},
+        { "zeta-prec", 'z', "ZETA_PREC", 0, "arb precision for zeta evaluation [default 64]"},
+        { "digits", 'd', "DIGITS", 0, "extra digits for number formatting [default 4]"},
+        { 0 }
+};
+
+struct arguments {
+    slong k;
+    slong eval;
+    double step0;
+    double w0;
+    slong PREC;
+    slong ZETA_PREC;
+    slong DIGITS;
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state) {
+    struct arguments *arguments = state->input;
+
+    switch (key) {
+        case 'k': arguments->k = atol(arg); break;
+        case 'e': arguments->eval = 1; break;
+        case 't': arguments->step0 = atof(arg); break;
+        case 'w': arguments->w0 = atof(arg); break;
+        case 'p': arguments->PREC = atol(arg); break;
+        case 'z': arguments->ZETA_PREC = atol(arg); break;
+        case 'd': arguments->DIGITS = atol(arg); break;
+        case ARGP_KEY_ARG: return 0;
+        default: return ARGP_ERR_UNKNOWN;
+    }
+    return 0;
+}
+
+static struct argp argp = { options, parse_opt, args_doc, doc, 0, 0, 0 };
+
 int main(int argc, char *argv[])
 {
-    if (argc < 2)
-    {
-        flint_printf("zzz n [off [eval [step [k [PREC [ZETA_PREC [DIGITS]]]]]]]\n");
-        flint_printf("    n         ... (n+off)-th zeta zero on critical line calculation [obligatory]\n");
-        flint_printf("    off       ... (n+off)-th zeta zero on critical line calculation [default 0]\n");
-        flint_printf("    eval      ... evaluate Riemann zeta function at the approximate zero location [default 1]\n");
-        flint_printf("    step      ... heuristic width (0.0, 0.25> [default 0.1]\n");
-        flint_printf("    k         ... use first k primes for zero counting function approximation [default 2]\n");
-        flint_printf("    PREC      ... arb precision for counting function approximation [default 256]\n");
-        flint_printf("    ZETA_PREC ... arb precision for zeta evaluation [default 64]\n");
-        flint_printf("    DIGITS    ... extra decimal digits for number formatting [default 4]\n");
+
+    if(argc == 1) {
+        flint_printf("zzz --usage for help\n");
         return 1;
     }
 
-    slong k = 2;
-    double step0 = 0.1;
-    slong ai = 2;
-    slong eval = 1;
+    struct arguments arguments;
+
+    arguments.k = 100;
+    arguments.DIGITS = 4;
+    arguments.PREC = 256;
+    arguments.ZETA_PREC = 64;
+    arguments.step0 = 0.01;
+    arguments.w0 = 1.5;
+    arguments.eval = 0;
+
+    int arg_index = 1;
+    argp_parse(&argp, argc, argv, ARGP_NO_ARGS, &arg_index, &arguments);
+
     arb_t m;
     arb_init(m);
 
-    if (argc > ai) arb_set_str(m, argv[ai++], PREC);
-    if (argc > ai) eval = atol(argv[ai++]);
-    if (argc > ai) step0 = atof(argv[ai++]);
-    if (argc > ai) k = atol(argv[ai++]);
-    if (argc > ai) PREC = atol(argv[ai++]);
-    if (argc > ai) ZETA_PREC = atol(argv[ai++]);
-    if (argc > ai) DIGITS = atol(argv[ai++]);
-
-    n_compute_primes(k);
+    if(arguments.k > 0)
+        n_compute_primes(arguments.k);
 
     arb_t u;
     arb_t m0;
@@ -475,19 +509,24 @@ int main(int argc, char *argv[])
     arb_init(tt);
     arb_init(step);
 
-    arb_set_str(m0, argv[1], PREC);
-    arb_add(m0, m0, m, PREC);
+    arb_set_str(m0, argv[arg_index], arguments.PREC);
+    if(argc > arg_index+1) {
+        arb_set_str(m, argv[arg_index+1], arguments.PREC);
+        arb_add(m0, m0, m, arguments.PREC);
+    } else {
+        arb_zero(m);
+    }
 
-    arb_const_log10(u, PREC);
-    arb_inv(u, u, PREC);
-    arb_log(m, m0, PREC);
-    arb_mul(u, m, u, PREC);
-    arb_floor(u, u, PREC);
-    DIGITS += arf_get_si(&u->mid, 0);
+    arb_const_log10(u, arguments.PREC);
+    arb_inv(u, u, arguments.PREC);
+    arb_log(m, m0, arguments.PREC);
+    arb_mul(u, m, u, arguments.PREC);
+    arb_floor(u, u, arguments.PREC);
+    arguments.DIGITS += arf_get_si(&u->mid, 0);
 
     arb_set_d(m, -0.5);
-    nt_inv(tt, m0);
-    arb_add(m, m0, m, PREC);
+    nt_inv(tt, m0, arguments.PREC);
+    arb_add(m, m0, m, arguments.PREC);
     arb_set(m_lo, m);
     arb_set(m_hi, m);
 
@@ -500,78 +539,118 @@ int main(int argc, char *argv[])
     arb_init(lo_t);
     arb_init(hi_t);
 
-    arb_set_d(lo, step0);
-    arb_set_d(hi, 0.5);
-    arb_mul(lo, lo, hi, PREC);
-    arb_sub(tt, tt, lo, PREC);
+    acb_t zz;
+    acb_init(zz);
 
-    arb_set_d(step, 1.0);
-    arb_set_d(hi, step0);
-    arb_mul(step, step, hi, PREC);
+    arb_pos_inf(lo_t);
+    arb_neg_inf(hi_t);
 
     arb_pos_inf(lo);
     arb_neg_inf(hi);
 
-    acb_t zz;
-    acb_init(zz);
+    arb_set_d(step, arguments.w0);
 
-    for(int i = 0; i <= 1; ++i) {
-        zero_count_approx(u, tt, k);
-        if(arb_lt(u, lo)) {
-            arb_set(lo, u);
-            arb_set(lo_t, tt);
-        }
-        if(arb_gt(u, hi)) {
-            arb_set(hi, u);
-            arb_set(hi_t, tt);
-        }
-        if(i<1) arb_add(tt, tt, step, PREC);
+    arb_sub(lo_t, tt, step, arguments.PREC);
+    arb_add(hi_t, tt, step, arguments.PREC);
+
+    zero_count_approx(lo, lo_t, arguments.k, arguments.PREC);
+    zero_count_approx(hi, hi_t, arguments.k, arguments.PREC);
+
+    flint_printf("zero counting function lower bound lo = ");
+    arb_printd(lo, arguments.DIGITS);
+    flint_printf("\n");
+    flint_printf("zero counting function upper bound hi = ");
+    arb_printd(hi, arguments.DIGITS);
+    flint_printf("\n\n");
+
+    flint_printf("zeta zero imaginary part lower approximation lo_t = ");
+    arb_printd(lo_t, arguments.DIGITS);
+    flint_printf("\n");
+    flint_printf("zeta zero imaginary part upper approximation hi_t = ");
+    arb_printd(hi_t, arguments.DIGITS);
+    flint_printf("\n\n");
+
+    if( arb_gt(lo, m) || arb_lt(hi, m) || arb_lt(hi, lo)) {
+        flint_printf("please increase the window\n");
+        return 0;
     }
-    flint_printf("zero counting function lower bound lo_t = ");
-    arb_printd(lo, DIGITS);
+
+    arb_t mid_t;
+    arb_t mid;
+    arb_init(mid);
+    arb_init(mid_t);
+
+    while(1) {
+
+        flint_printf("zero counting function lower bound lo = ");
+        arb_printd(lo, arguments.DIGITS);
+        flint_printf("\n");
+        flint_printf("zero counting function upper bound hi = ");
+        arb_printd(hi, arguments.DIGITS);
+        flint_printf("\n\n");
+
+        flint_printf("zeta zero imaginary part lower approximation lo_t = ");
+        arb_printd(lo_t, arguments.DIGITS);
+        flint_printf("\n");
+        flint_printf("zeta zero imaginary part upper approximation hi_t = ");
+        arb_printd(hi_t, arguments.DIGITS);
+        flint_printf("\n\n");
+
+        arb_add(mid_t, lo_t, hi_t, arguments.PREC);
+        arb_set_d(m0, 0.5);
+        arb_mul(mid_t, mid_t, m0, arguments.PREC);
+
+        zero_count_approx(mid, mid_t, arguments.k, arguments.PREC);
+
+        arb_sub(m0, hi, lo, arguments.PREC);
+        arb_set_d(u, arguments.step0);
+        if(arb_lt(m0, u)) break;
+
+        arb_zero(m0);
+        if(arb_gt(mid, m)) {
+            arb_set(hi_t, mid_t);
+        }
+        else {
+            arb_set(lo_t, mid_t);
+        }
+
+        zero_count_approx(lo, lo_t, arguments.k, arguments.PREC);
+        zero_count_approx(hi, hi_t, arguments.k, arguments.PREC);
+
+        }
+
+    flint_printf("zero counting function lower bound lo = ");
+    arb_printd(lo, arguments.DIGITS);
     flint_printf("\n");
-    flint_printf("zero counting function upper bound hi_t = ");
-    arb_printd(hi, DIGITS);
+    flint_printf("zero counting function upper bound hi = ");
+    arb_printd(hi, arguments.DIGITS);
     flint_printf("\n\n");
 
-    flint_printf("zeta zero imaginary part lower approximation lo = ");
-    arb_printd(lo_t, DIGITS);
+    flint_printf("zeta zero imaginary part lower approximation lo_t = ");
+    arb_printd(lo_t, arguments.DIGITS);
     flint_printf("\n");
-    flint_printf("zeta zero imaginary part upper approximation hi = ");
-    arb_printd(hi_t, DIGITS);
+    flint_printf("zeta zero imaginary part upper approximation hi_t = ");
+    arb_printd(hi_t, arguments.DIGITS);
     flint_printf("\n\n");
 
-    arb_t aa;
-    arb_t bb;
-    arb_init(aa);
-    arb_init(bb);
-
-    arb_set(aa, lo_t);
-    arb_set(bb, hi_t);
-
-    arb_sub(tt, hi, lo, PREC);
-    arb_inv(tt, tt, PREC);
-    arb_sub(m, m, lo, PREC);
-    arb_mul(tt, m, tt, PREC);
-    arb_sub(m, bb, aa, PREC);
-    arb_mul(tt, tt, m, PREC);
-    arb_add(tt, tt, aa, PREC);
-
-
-    flint_printf("Riemann zeta argument s = ");
-    arb_set_d(m, 0.5);
-    acb_set_arb_arb(zz, m, tt);
-    acb_printd(zz, DIGITS);
-
-    if(eval > 0) {
+    arb_set_d(lo_t, 0.5);
+    acb_set_arb_arb(zz, lo_t, mid_t);
+    acb_printd(zz, arguments.DIGITS);
+    flint_printf("\n");
+    if(arguments.eval > 0) {
         flint_printf("\nRiemann zeta value    z = ");
-        zeta(zz, tt);
-        acb_printd(zz, DIGITS);
+        zeta(zz, mid_t, arguments.ZETA_PREC);
+        acb_printd(zz, arguments.DIGITS);
     }
-    flint_printf("\n\nTo be refined.\n\n");
-    arf_printd(&tt->mid, DIGITS);
+    flint_printf("\n");
+    arb_set_d(lo_t, 0.005);
+
+    flint_printf("\nTo be refined.\n\n");
+    arf_printd(&mid_t->mid, arguments.DIGITS);
     flint_printf("\n");
 
+    arb_clear(mid);
+    arb_clear(mid_t);
     arb_clear(m);
     arb_clear(u);
     arb_clear(m0);
@@ -583,9 +662,6 @@ int main(int argc, char *argv[])
     arb_clear(hi);
     arb_clear(lo_t);
     arb_clear(hi_t);
-    arb_clear(aa);
-    arb_clear(bb);
     acb_clear(zz);
-
     return 0;
 }
