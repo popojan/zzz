@@ -609,15 +609,13 @@ int main(int argc, char *argv[])
         arb_zero(m0);
         if(arb_gt(mid, m)) {
             arb_set(hi_t, mid_t);
+            arb_set(hi, mid);
         }
         else {
             arb_set(lo_t, mid_t);
+            arb_set(lo, mid);
         }
-
-        zero_count_approx(lo, lo_t, arguments.k, arguments.PREC);
-        zero_count_approx(hi, hi_t, arguments.k, arguments.PREC);
-
-        }
+    }
 
     flint_printf("zero counting function lower bound lo = ");
     arb_printd(lo, arguments.DIGITS);
