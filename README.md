@@ -45,7 +45,7 @@ in comparison with k=0 (basic ProductLog approximation)
 
 ## Zero # 10^12 + 1
 
-see [~odlyzko/zeta_tables/zeros5](https://www-users.cse.umn.edu/~odlyzko/zeta_tables/zeros3)
+see [~odlyzko/zeta_tables/zeros3](https://www-users.cse.umn.edu/~odlyzko/zeta_tables/zeros3)
 
 ```bash
 $time ./zzz -e -k 1000 1e12 +1
@@ -64,11 +64,10 @@ sys	0m0.005s
 ## Zero # 10^36 + 42420637374017961984
 
 ```bash
-$ time ./zzz -k 10000 1e36 42420637374017961984
+$ time ./zzz -k 10000 1e36 42420637374017961984 | tail -n1
 ```
 
 ```text
-argument s = 	(0.5000000000000000000000000000000000000000 + 81029194732694548890047854481676713.01026j)  +/-  (0, 3.53e-42j)
 81029194732694548890047854481676713.01026
 
 real	0m2.096s
