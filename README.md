@@ -1,16 +1,25 @@
 # Zeta Zeros Zeal
-fast approximate location of large Riemann zeta zeros on the critical line
+fast approximation of large Riemann zeta zeros on the critical line
 
 ```text
-zzz n [off [eval [step [k [PREC [ZETA_PREC [DIGITS]]]]]]]
-    n         ... (n+off)-th zeta zero on critical line calculation [obligatory]
-    off       ... (n+off)-th zeta zero on critical line calculation [default 0]
-    eval      ... evaluate Riemann zeta function at the approximate zero location [default 1]
-    step      ... heuristic width (0.0, 0.25> [default 0.1]
-    k         ... use first k primes for zero counting function approximation [default 2]
-    PREC      ... arb precision for counting function approximation [default 256]
-    ZETA_PREC ... arb precision for zeta evaluation [default 64]
-    DIGITS    ... extra decimal digits for number formatting [default 4]
+Usage: zzz [OPTION...] N [offset]
+fast approximation of large Riemann zeta zeros
+
+  -d, --digits=DIGITS        extra digits for number formatting [default 4]
+  -e, --evaluate             evaluate Riemann zeta function value at the
+                             approximate zero location
+  -k, --k=K                  use first k primes for zero counting function
+                             approximation [default 100]
+  -p, --precision=PREC       arb precision for counting function approximation
+                             [default 256]
+  -t, --tolerance=TOL        tolerance for bisection [default 0.5]
+  -v, --verbose              verbose progress output
+  -w, --window=WIN           initial span around Lambert W asymptotic zero
+                             location +- WIN [default 1.5]
+  -z, --zeta-prec=ZETA_PREC  arb precision for zeta evaluation [default 64]
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
 ```
 
 
