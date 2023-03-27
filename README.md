@@ -30,8 +30,6 @@ Combines quadratic and cubic spline with correct frequency and tangents to match
 
 ## Towards convergence
 
-Error bounds derived from sum of exact saw peaks.
-
 ![waves](doc/convergence.png)
 
 ## Error distribution
