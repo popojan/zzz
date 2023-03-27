@@ -2,7 +2,7 @@
 fast approximation of large Riemann zeta zeros on the critical line
 
 ```text
-Usage: zzz [OPTION...] N [offset]
+Usage: zzz [OPTION...] N [offset] [count]
 fast approximation of large Riemann zeta zeros
 
   -d, --digits=DIGITS        extra digits for number formatting [default 4]
@@ -12,7 +12,7 @@ fast approximation of large Riemann zeta zeros
                              approximation [default 100]
   -p, --precision=PREC       arb precision for counting function approximation
                              [default 256]
-  -t, --tolerance=TOL        tolerance for bisection [default 0.5]
+  -t, --tolerance=TOL        tolerance for bisection [default 0.01]
   -v, --verbose              verbose progress output
   -w, --window=WIN           initial span around Lambert W asymptotic zero
                              location +- WIN [default 1.5]
@@ -45,7 +45,7 @@ In comparison with k=0 (basic Lambert W approximation).
 see [~odlyzko/zeta_tables/zeros3](https://www-users.cse.umn.edu/~odlyzko/zeta_tables/zeros3)
 
 ```bash
-$time ./zzz -e -k 1000 1e12 +1
+$time ./zzz -ve -k 1000 1e12 +1
 ```
 
 ```
@@ -61,7 +61,7 @@ sys	0m0.005s
 ## Zero # 10^36 + 42420637374017961984
 
 ```bash
-$ time ./zzz -k 10000 1e36 42420637374017961984 | tail -n1
+  $ time ./zzz -k 10000 1e36 42420637374017961984
 ```
 
 ```text
