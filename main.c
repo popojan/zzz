@@ -23,13 +23,10 @@ void coord(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
     arb_mul(pi_div_log_q, pi_div_log_q, pi, PREC);
 
     // -t + PI / Log[q]
-    arb_set(x, pi_div_log_q);
-    arb_sub(x, x, t, PREC);
+    arb_sub(x, pi_div_log_q, t, PREC);
 
     //Mod[-t + PI / Log[q], 2 PI / Log[q]]
-    arb_set_d(b, 2.0);
-    arb_set(a, pi_div_log_q);
-    arb_mul(a, a, b, PREC);
+    arb_add(a, pi_div_log_q, pi_div_log_q, PREC);
     arb_div(b, x, a, PREC);
     arb_floor(b, b, PREC);
     arb_mul(b, b, a, PREC);
@@ -67,14 +64,13 @@ void wave2(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
 
 
     //4 sqrt[q] log[q] t
-    arb_set_d(a, 4.0);
-    arb_mul(a, a, t, PREC);
-    arb_mul(a, a, log_q, PREC);
-    arb_mul(a, a, sqrt_q, PREC);
+    arb_mul_ui(a, t, 4,PREC);
+    arb_mul(b, log_q, sqrt_q, PREC);
+    arb_mul(a, a, b, PREC);
 
     //PI (sqrt[q]-1)^2
-    arb_set_d(b, -1.0);
-    arb_add(b, b, sqrt_q, PREC);
+    arb_one(b);
+    arb_sub(b, sqrt_q, b, PREC);
     arb_mul(b, b, b, PREC);
     arb_mul(b, b, pi, PREC);
 
@@ -100,8 +96,7 @@ void wave2(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
     arb_add(b, pi, pi, PREC);
     arb_div(a, a, b, PREC);
 
-    arb_set_d(b, 0.5);
-    arb_mul(b, b, sqrt_q, PREC);
+    arb_div_ui(b, sqrt_q, 2, PREC);
     arb_sub(a, a, b, PREC);
     arb_set_d(b, 0.5);
     arb_add(a, a, b, PREC);
@@ -164,8 +159,7 @@ void wave3(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
     arb_add(a, a, b, PREC);
 
     arb_mul(b, t, log_q, PREC);
-    arb_set_d(c, 8.0);
-    arb_mul(c, c, sqrt_q, PREC);
+    arb_mul_ui(c, sqrt_q, 8, PREC);
     arb_mul(b, b, c, PREC);
     arb_mul(a, a, b, PREC);
     //a == -8 sqrt[q]...
@@ -178,10 +172,8 @@ void wave3(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
     arb_mul(b, b, d, PREC);
     //b == pi^2 ( sqrt[q]-1)^3
 
-    arb_set_d(c, 5.0);
-    arb_mul(c, c, sqrt_q, PREC);
-    arb_set_d(d, 3.0);
-    arb_add(c, c, d, PREC);
+    arb_mul_ui(c, sqrt_q, 5,PREC);
+    arb_add_ui(c, c, 3, PREC);
     arb_mul(b, b, c, PREC);
     arb_sub(a, b, a, PREC);
     //a == pi^2..... (...Log[q]), numerator
@@ -191,28 +183,21 @@ void wave3(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
     arb_sqrt(a, a, PREC);
     //a == sqrt(numerator / q^2)
 
-    arb_set_d(b, 4.0);
     arb_mul(c, t, log_q, PREC);
-    arb_mul(b, b, c, PREC);
+    arb_mul_ui(b, c, 4,PREC);
     arb_add(a, a, b, PREC);
 
-    arb_set_d(b, 3.0);
-    arb_mul(b, b, q, PREC);
+    arb_mul_ui(b, q, 3, PREC);
     arb_one(c);
     arb_sub(b, b, c, PREC);
     arb_div(b, b, sqrt_q3, PREC);
-    arb_set_d(c, 2.0);
-    arb_sub(b, b, c, PREC);
+    arb_sub_ui(b, b, 2, PREC);
     arb_mul(b, b, pi, PREC);
     arb_add(a, a, b, PREC);
     //a==a
 
-    arb_set_d(c, 1.0);
-    arb_set_d(d, 3.0);
-    arb_div(c, c, d, PREC);
-
-    arb_pow(pi, pi, c, PREC);
-    arb_pow(b, a, c, PREC);
+    arb_root_ui(pi, pi, 3, PREC);
+    arb_root_ui(b, a, 3, PREC);
 
     arb_one(d);
     arb_sub(d, sqrt_q, d, PREC);
@@ -237,7 +222,7 @@ void wave3(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
 
     arb_one(y);
     arb_sub(y, q, y, PREC);
-    arb_mul(y, y, pi, PREC);
+    arb_mul(pi, pi, pi, PREC);
     arb_mul(y, y, pi, PREC);
     arb_add(y, y, d, PREC);
     arb_mul(d, q, b, PREC);
@@ -245,15 +230,14 @@ void wave3(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
     arb_sub(y, y, d, PREC);
 
     arb_mul(x, x, y, PREC);
-    arb_set_d(y, -3.0);
+    arb_set_d(y, -0.375);
     arb_mul(x, x, y, PREC);
-    arb_set_d(y, 8.0);
-    arb_mul(y, y, pi, PREC);
-    arb_mul(y, y, pi, PREC);
+    arb_mul(y, pi, b, PREC);
     arb_mul(y, y, b, PREC);
-    arb_mul(y, y, b, PREC);
-    arb_set_d(b, 2.5);
-    arb_pow(b, q, b, PREC);
+    //arb_set_d(b, 2.5);
+    //arb_pow(b, q, b, PREC);
+    arb_pow_ui(b, q, 5, PREC);
+    arb_sqrt(b, b, PREC);
     arb_mul(y, y, b, PREC);
     arb_div(x, x, y, PREC);
     arb_set(out, x);
@@ -295,18 +279,15 @@ void nt(arb_ptr out, arb_srcptr t, slong PREC) {
     arb_init(b);
 
     arb_set(x, t);
-    arb_set_d(a, 2.0);
     arb_const_pi(b, PREC);
-    arb_div(x, x, a, PREC);
+    arb_div_ui(x, x, 2, PREC);
     arb_div(x, x, b, PREC);
     arb_set(a, x);
     arb_const_e(b, PREC);
     arb_div(a, a, b, PREC);
     arb_log(a, a, PREC);
     arb_mul(x, a, x, PREC);
-    arb_set_d(a, 7.0);
-    arb_set_d(b, 8.0);
-    arb_div(a, a, b, PREC);
+    arb_set_d(a, 0.875);
     arb_add(x, x, a, PREC);
     arb_set(out, x);
 
@@ -327,10 +308,8 @@ void nt_inv(arb_ptr out, arb_srcptr m, slong PREC) {
     arb_init(den);
     arb_init(nom);
 
-    arb_set_d(x, 8.0);
-    arb_mul(x, x, m, PREC);
-    arb_set_d(a, 11.0);
-    arb_sub(x, x, a, PREC);
+    arb_mul_ui(x, m, 8, PREC);
+    arb_sub_ui(x, x, 11, PREC);
 
     arb_set(nom, x);
     arb_const_pi(b, PREC);
@@ -339,11 +318,9 @@ void nt_inv(arb_ptr out, arb_srcptr m, slong PREC) {
     arb_set(den, x);
     arb_const_e(b, PREC);
     arb_div(den, den, b, PREC);
-    arb_set_d(b, 8.0);
-    arb_div(den, den, b, PREC);
+    arb_div_ui(den, den, 8, PREC);
     arb_lambertw( den, den, 0, PREC);
-    arb_set_d(b, 4.0);
-    arb_mul(den, den, b, PREC);
+    arb_mul_ui(den, den, 4, PREC);
 
     arb_set(x, nom);
     arb_div(x, x, den, PREC);
@@ -366,6 +343,7 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
     arb_t z;
     arb_t v;
     arb_t s;
+    int neg;
 
     arb_init(u);
     arb_init(w);
@@ -378,36 +356,41 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
 
     nt(u, t, PREC);
 
+#if CUBIC == 1
+    //v = 1/sqrt(2)
+    arb_set_d(v, 2.0);
+    arb_sqrt(v, v, PREC);
+    arb_inv(v, v, PREC);
+#endif
+
     for(int i = 1; i <= k; ++i) {
         arb_set_d(q, n_nth_prime(i));
         coord(x, q, t, PREC);
         arb_abs(w, x);
 
         wave2(z, q, w, PREC);
-        if(arb_is_negative(x)) {
+
+        neg = arb_is_negative(x);
+        if(neg) {
             arb_neg(z, z);
         }
 #if CUBIC == 1
-        arb_set_d(v, 2.0);
-        arb_sqrt(v, v, PREC);
-        arb_inv(v, v, PREC);
         arb_set_d(y, i);
         arb_pow(y, y, v, PREC);
-        arb_set_d(v, 3.0);
-        arb_mul(y, y, v, PREC);
-        arb_inv(v, y, PREC);
+        arb_mul_ui(y, y, 3, PREC);
+        arb_inv(x, y, PREC);
 
         arb_set_d(y, 0.5);
-        arb_sub(y, y, v, PREC);
+        arb_sub(y, y, x, PREC);
         arb_mul(z, z, y, PREC);
         arb_add(u, u, z, PREC);
 
         wave3(z, q, w, PREC);
-        if(arb_is_negative(x)) {
+        if(neg) {
             arb_neg(z, z);
         }
         arb_set_d(y, 0.5);
-        arb_add(y, y, v, PREC);
+        arb_add(y, y, x, PREC);
         arb_mul(z, z, y, PREC);
 #endif
         arb_add(u, u, z, PREC);
@@ -431,7 +414,7 @@ static char args_doc[] = "N [offset] [count]";
 static struct argp_option options[] = {
         { "k", 'k', "K", 0, "use first k primes for zero counting function approximation [default 100]"},
         { "evaluate", 'e', 0, 0, "evaluate Riemann zeta function value at the approximate zero location"},
-        { "tolerance", 't', "TOL", 0, "tolerance for bisection [default 0.01]"},
+        { "tolerance", 't', "TOL", 0, "tolerance for bisection [default 1e-6]"},
         { "window", 'w', "WIN", 0, "initial span around Lambert W asymptotic zero location +- WIN [default 1.5]"},
         { "precision", 'p', "PREC", 0, "arb precision for counting function approximation [default 256]"},
         { "zeta-prec", 'z', "ZETA_PREC", 0, "arb precision for zeta evaluation [default 64]"},
@@ -502,7 +485,7 @@ int main(int argc, char *argv[])
     arguments.DIGITS = 4;
     arguments.PREC = 256;
     arguments.ZETA_PREC = 64;
-    arguments.step0 = 0.01;
+    arguments.step0 = 0.000001;
     arguments.w0 = 1.5;
     arguments.eval = 0;
     arguments.verbose = 0;
@@ -644,13 +627,12 @@ int main(int argc, char *argv[])
                 acb_set_arb_arb(zz, lo_t, mid_t);
                 acb_fprintd(stderr, zz, digits);
                 flint_fprintf(stderr, "\n");
-
-                if (arguments.eval > 0) {
-                    flint_fprintf(stderr, "value    z = \t");
-                    zeta(zz, mid_t, arguments.ZETA_PREC);
-                    acb_fprintd(stderr, zz, digits);
-                    flint_fprintf(stderr, "\n");
-                }
+            }
+            if (arguments.eval > 0) {
+                flint_fprintf(stderr, "value    z = \t");
+                zeta(zz, mid_t, arguments.ZETA_PREC);
+                acb_fprintd(stderr, zz, digits);
+                flint_fprintf(stderr, "\n");
             }
             arb_set_d(lo_t, 0.005);
 

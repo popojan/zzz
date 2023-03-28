@@ -12,7 +12,7 @@ fast approximation of large Riemann zeta zeros
                              approximation [default 100]
   -p, --precision=PREC       arb precision for counting function approximation
                              [default 256]
-  -t, --tolerance=TOL        tolerance for bisection [default 0.01]
+  -t, --tolerance=TOL        tolerance for bisection [default 1e-6]
   -v, --verbose              verbose progress output
   -w, --window=WIN           initial span around Lambert W asymptotic zero
                              location +- WIN [default 1.5]
@@ -49,13 +49,13 @@ $time ./zzz -ve -k 1000 1e12 +1
 ```
 
 ```
-argument s = 	(0.5000000000000000 + 267653395648.8477j)  +/-  (0, 1.05e-65j)
-value    z = 	(-0.01633683696845106 - 0.005421210637911910j)  +/-  (1.17e-20, 1.05e-20j)
-267653395648.8477
+argument s = 	(0.5000000000000000 + 267653395648.8474j)  +/-  (0, 1.05e-65j)
+value    z = 	(0.01666101974687720 + 0.005586947242336326j)  +/-  (1.17e-20, 1.05e-20j)
+267653395648.8474
 
-real	0m0.270s
-user	0m0.264s
-sys	0m0.005s
+real	0m0.474s
+user	0m0.469s
+sys	0m0.002s
 ```
 
 ## Zero # 10^36 + 42420637374017961984
@@ -65,17 +65,17 @@ sys	0m0.005s
 ```
 
 ```text
-81029194732694548890047854481676713.01026
+81029194732694548890047854481676713.01010
 
-real	0m2.096s
-user	0m2.083s
-sys	0m0.003s
+real	0m4.266s
+user	0m4.249s
+sys	0m0.002s
 ```
 
 ```
 81029194732694548890047854481676712.93997   prev approximate     #10^36+42420637374017961983
 81029194732694548890047854481676712.98790          published     #10^36+42420637374017961984
-81029194732694548890047854481676713.01026        approximate     #10^36+42420637374017961984
+81029194732694548890047854481676713.01010        approximate     #10^36+42420637374017961984
 81029194732694548890047854481676713.08806   next approximate     #10^36+42420637374017961985
 ```
 
