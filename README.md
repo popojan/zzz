@@ -5,7 +5,7 @@ fast approximation of large Riemann zeta zeros on the critical line
 Usage: zzz [OPTION...] N [offset] [count]
 fast approximation of large Riemann zeta zeros
 
-  -d, --digits=DIGITS        extra digits for number formatting [default 4]
+  -d, --digits=DIGITS        extra digits for number formatting [default 6]
   -e, --evaluate             evaluate Riemann zeta function value at the
                              approximate zero location
   -k, --k=K                  use first k primes for zero counting function
@@ -45,17 +45,17 @@ In comparison with k=0 (basic Lambert W approximation).
 see [~odlyzko/zeta_tables/zeros3](https://www-users.cse.umn.edu/~odlyzko/zeta_tables/zeros3)
 
 ```bash
-$time ./zzz -ve -k 1000 1e12 +1
+$ time ./zzz -ve -k 1000 1e12 +1
 ```
 
 ```
-argument s = 	(0.5000000000000000 + 267653395648.8474j)  +/-  (0, 1.05e-65j)
-value    z = 	(0.01666101974687720 + 0.005586947242336326j)  +/-  (1.17e-20, 1.05e-20j)
-267653395648.8474
+argument s = 	(0.500000000000000000 + 267653395648.847393j)  +/-  (0, 1.05e-65j)
+value    z = 	(0.0166724860775396361 + 0.00559081254510210870j)  +/-  (1.17e-20, 1.05e-20j)
+267653395648.847393
 
-real	0m0.474s
-user	0m0.469s
-sys	0m0.002s
+real	0m0.425s
+user	0m0.418s
+sys	0m0.004s
 ```
 
 ## Zero # 10^36 + 42420637374017961984
@@ -65,10 +65,10 @@ sys	0m0.002s
 ```
 
 ```text
-81029194732694548890047854481676713.01010
+81029194732694548890047854481676713.010104
 
-real	0m4.266s
-user	0m4.249s
+real	0m3.633s
+user	0m3.620s
 sys	0m0.002s
 ```
 

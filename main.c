@@ -418,7 +418,7 @@ static struct argp_option options[] = {
         { "window", 'w', "WIN", 0, "initial span around Lambert W asymptotic zero location +- WIN [default 1.5]"},
         { "precision", 'p', "PREC", 0, "arb precision for counting function approximation [default 256]"},
         { "zeta-prec", 'z', "ZETA_PREC", 0, "arb precision for zeta evaluation [default 64]"},
-        { "digits", 'd', "DIGITS", 0, "extra digits for number formatting [default 4]"},
+        { "digits", 'd', "DIGITS", 0, "extra digits for number formatting [default 6]"},
         { "verbose", 'v', 0, 0, "verbose progress output"},
         { 0 }
 };
@@ -482,7 +482,7 @@ int main(int argc, char *argv[])
     struct arguments arguments;
 
     arguments.k = 100;
-    arguments.DIGITS = 4;
+    arguments.DIGITS = 6;
     arguments.PREC = 256;
     arguments.ZETA_PREC = 64;
     arguments.step0 = 0.000001;
@@ -532,22 +532,24 @@ int main(int argc, char *argv[])
 
     for(slong ord = 0; ord < count || count < 0; ++ord) {
 
+        nt_inv(tt, m0, arguments.PREC);
+
         //calc required digits
         arb_const_log10(u, arguments.PREC);
-        arb_inv(u, u, arguments.PREC);
-        arb_log(m, m0, arguments.PREC);
-        arb_mul(u, m, u, arguments.PREC);
-        arb_floor(u, u, arguments.PREC);
+        arb_log(m, tt, arguments.PREC);
+        arb_div(u, m, u, arguments.PREC);
+        arb_ceil(u, u, arguments.PREC);
+
         slong digits = arguments.DIGITS;
         digits += arf_get_si(&u->mid, 0);
 
-        arb_set_d(m, -0.5);
-        nt_inv(tt, m0, arguments.PREC);
         if (arguments.verbose) {
             flint_fprintf(stderr, "asymptotic zero location = ");
             arb_fprintd(stderr, tt, digits);
             flint_fprintf(stderr, "\n");
         }
+
+        arb_set_d(m, -0.5);
         arb_add(m, m0, m, arguments.PREC);
         arb_set(m_lo, m);
         arb_set(m_hi, m);
@@ -605,10 +607,6 @@ int main(int argc, char *argv[])
 
                 zero_count_approx(mid, mid_t, arguments.k, arguments.PREC);
 
-                arb_sub(mm, hi, lo, arguments.PREC);
-                arb_set_d(u, arguments.step0);
-                if (arb_lt(mm, u)) break;
-
                 arb_zero(mm);
                 if (arb_gt(mid, m)) {
                     arb_set(hi_t, mid_t);
@@ -617,6 +615,11 @@ int main(int argc, char *argv[])
                     arb_set(lo_t, mid_t);
                     arb_set(lo, mid);
                 }
+
+                arb_sub(mm, hi_t, lo_t, arguments.PREC);
+                arb_set_d(u, arguments.step0);
+                if (arb_lt(mm, u)) break;
+
             }
 
             iter_print(lo_t, lo, hi_t, hi, digits, arguments.verbose);
