@@ -79,6 +79,14 @@ sys	0m0.002s
 81029194732694548890047854481676713.08837   next approximate     #10^36+42420637374017961985
 ```
 
+## Chebyshev Psi Exact Formula
+
+Using zeros approximated by default `zzz` settings.
+
+range 0 to 20  (50 zeros)          | range 541 to 661 (10,000 zeros)                        | range 7920-8020 (10,000 zeros)  
+:---------------------------------:|:------------------------------------------------------:|:--------------------------------------:
+![](doc/psi-50-zeros-k100-p1.png)  |          ![](doc/psi-10k-zeros-k100-p100.png)          | ![](doc/psi-10k-zeros-k100-p1000.png)
+
 
 # Literature
 
@@ -88,3 +96,5 @@ sys	0m0.002s
   * https://arxiv.org/abs/1607.00709
 * M. V. Berry, J. P. Keating: *The Riemann Zeros and Eigenvalue Asymptotics*
   * https://empslocal.ex.ac.uk/people/staff/mrwatkin/zeta/berry-keating1.pdf
+* Guilherme França, André LeClair: *Statistical and other properties of Riemann zeros based on an explicit equation for the n-th zero on the critical line*
+  * https://arxiv.org/abs/1307.8395
