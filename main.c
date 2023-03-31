@@ -343,6 +343,7 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
     arb_t z;
     arb_t v;
     arb_t s;
+    arb_t att;
     int neg;
 
     arb_init(u);
@@ -352,6 +353,7 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
     arb_init(z);
     arb_init(v);
     arb_init(s);
+    arb_init(att);
     arb_init(x);
 
     nt(u, t, PREC);
@@ -365,6 +367,15 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
 
     for(int i = 1; i <= k; ++i) {
         arb_set_d(q, n_nth_prime(i));
+
+        arb_sqrt(att, q, PREC);
+        arb_log(w, t, PREC);
+        arb_div(att, w, att, PREC);
+        arb_neg(att, att);
+        arb_exp(att, att, PREC);;
+        arb_one(w);
+        arb_sub(att, w, att, PREC);
+
         coord(x, q, t, PREC);
         arb_abs(w, x);
 
@@ -383,6 +394,7 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
         arb_set_d(y, 0.5);
         arb_sub(y, y, x, PREC);
         arb_mul(z, z, y, PREC);
+        arb_mul(z, z, att, PREC);
         arb_add(u, u, z, PREC);
 
         wave3(z, q, w, PREC);
@@ -392,6 +404,7 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
         arb_set_d(y, 0.5);
         arb_add(y, y, x, PREC);
         arb_mul(z, z, y, PREC);
+        arb_mul(z, z, att, PREC);
 #endif
         arb_add(u, u, z, PREC);
     }
@@ -404,6 +417,7 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
     arb_clear(z);
     arb_clear(v);
     arb_clear(s);
+    arb_clear(att);
     arb_clear(x);
 }
 
