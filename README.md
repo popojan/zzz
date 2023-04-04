@@ -8,6 +8,8 @@ fast approximation of large Riemann zeta zeros
   -d, --digits=DIGITS        extra digits for number formatting [default 6]
   -e, --evaluate             evaluate Riemann zeta function value at the
                              approximate zero location
+  -g, --debug                debug counting function from <N> to <N+offset> in
+                             <count> steps
   -k, --k=K                  use first k primes for zero counting function
                              approximation [default 100]
   -p, --precision=PREC       arb precision for counting function approximation
@@ -81,11 +83,11 @@ sys	0m0.002s
 
 ## Chebyshev Psi Exact Formula
 
-Using zeros approximated by default `zzz` settings.
+Using zeros approximated by `zzz -k 1000`.
 
-range 0 to 20  (50 zeros)          | range 541 to 661 (10,000 zeros)                        | range 7920-8020 (10,000 zeros)  
-:---------------------------------:|:------------------------------------------------------:|:--------------------------------------:
-![](doc/psi-50-zeros-k100-p1.png)  |          ![](doc/psi-10k-zeros-k100-p100.png)          | ![](doc/psi-10k-zeros-k100-p1000.png)
+range 0 to 20  (50 zeros)          |    range 541 to 661 (1,000 zeros)     | range 7920-8020 (10,000 zeros)  
+:---------------------------------:|:-------------------------------------:|:--------------------------------------:
+![](doc/psi-50-zeros-k1000-p1.png) | ![](doc/psi-10k-zeros-k1000-p100.png) | ![](doc/psi-10k-zeros-k1000-p1000.png)
 
 
 # Literature

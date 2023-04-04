@@ -368,9 +368,8 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
     for(int i = 1; i <= k; ++i) {
         arb_set_d(q, n_nth_prime(i));
 
-        arb_sqrt(att, q, PREC);
-        arb_log(w, t, PREC);
-        arb_div(att, w, att, PREC);
+        arb_div(att, t, q, PREC);
+        arb_sqrt(att,att,PREC);
         arb_neg(att, att);
         arb_exp(att, att, PREC);;
         arb_one(w);
@@ -404,8 +403,8 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
         arb_set_d(y, 0.5);
         arb_add(y, y, x, PREC);
         arb_mul(z, z, y, PREC);
-        arb_mul(z, z, att, PREC);
 #endif
+        arb_mul(z, z, att, PREC);
         arb_add(u, u, z, PREC);
     }
     arb_set(out, u);
@@ -434,6 +433,7 @@ static struct argp_option options[] = {
         { "zeta-prec", 'z', "ZETA_PREC", 0, "arb precision for zeta evaluation [default 64]"},
         { "digits", 'd', "DIGITS", 0, "extra digits for number formatting [default 6]"},
         { "verbose", 'v', 0, 0, "verbose progress output"},
+        { "debug", 'g', 0, 0, "debug counting function from <N> to <N+offset> in <count> steps"},
         { 0 }
 };
 
@@ -446,6 +446,7 @@ struct arguments {
     slong ZETA_PREC;
     slong DIGITS;
     slong verbose;
+    slong debug;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -460,6 +461,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 'z': arguments->ZETA_PREC = atol(arg); break;
         case 'd': arguments->DIGITS = atol(arg); break;
         case 'v': arguments->verbose = 1; break;
+        case 'g': arguments->debug = 1; break;
         case ARGP_KEY_ARG: return 0;
         default: return ARGP_ERR_UNKNOWN;
     }
@@ -503,6 +505,7 @@ int main(int argc, char *argv[])
     arguments.w0 = 1.5;
     arguments.eval = 0;
     arguments.verbose = 0;
+    arguments.debug = 0;
 
     int arg_index = 1;
     argp_parse(&argp, argc, argv, ARGP_NO_ARGS, &arg_index, &arguments);
@@ -532,7 +535,6 @@ int main(int argc, char *argv[])
     }
     if(argc > arg_index+1) {
         arb_set_str(m, argv[arg_index+1], arguments.PREC);
-        arb_add(m0, m0, m, arguments.PREC);
     }
 
     slong count = 1;
@@ -544,132 +546,157 @@ int main(int argc, char *argv[])
         n_compute_primes(arguments.k);
     }
 
-    for(slong ord = 0; ord < count || count < 0; ++ord) {
+    if(arguments.debug) {
+        arb_t tx;
+        arb_t zc;
+        arb_t stp;
 
-        nt_inv(tt, m0, arguments.PREC);
+        arb_init(tx);
+        arb_init(zc);
+        arb_init(stp);
+        arb_zero(tx);
+        arb_set(stp, m);
+        arb_div_ui(stp, stp, count, arguments.PREC);
+        arb_set(tx, m0);
+        arb_add(m, m, m0, arguments.PREC);
 
-        //calc required digits
-        arb_const_log10(u, arguments.PREC);
-        arb_log(m, tt, arguments.PREC);
-        arb_div(u, m, u, arguments.PREC);
-        arb_ceil(u, u, arguments.PREC);
-
-        slong digits = arguments.DIGITS;
-        digits += arf_get_si(&u->mid, 0);
-
-        if (arguments.verbose) {
-            flint_fprintf(stderr, "asymptotic zero location = ");
-            arb_fprintd(stderr, tt, digits);
-            flint_fprintf(stderr, "\n");
+        for (; arb_lt(tx, m); arb_add(tx, tx, stp, arguments.PREC)) {
+            zero_count_approx(zc, tx, arguments.k, arguments.PREC);
+            arf_printd(&tx->mid, arguments.DIGITS);
+            flint_printf("\t");
+            arf_printd(&zc->mid, arguments.DIGITS);
+            flint_printf("\n");
         }
+    } else {
+        arb_add(m0, m0, m, arguments.PREC);
 
-        arb_set_d(m, -0.5);
-        arb_add(m, m0, m, arguments.PREC);
-        arb_set(m_lo, m);
-        arb_set(m_hi, m);
+        for (slong ord = 0; ord < count || count < 0; ++ord) {
 
-        arb_t lo;
-        arb_t hi;
-        arb_t lo_t;
-        arb_t hi_t;
+            nt_inv(tt, m0, arguments.PREC);
 
-        arb_init(lo);
-        arb_init(hi);
-        arb_init(lo_t);
-        arb_init(hi_t);
+            //calc required digits
+            arb_const_log10(u, arguments.PREC);
+            arb_log(m, tt, arguments.PREC);
+            arb_div(u, m, u, arguments.PREC);
+            arb_ceil(u, u, arguments.PREC);
 
-        // tt / 2 PI
-        arb_const_pi(lo_t, arguments.PREC);
-        arb_div(hi, tt, lo_t, arguments.PREC);
-        arb_set_d(lo_t, 0.5);
-        arb_mul(hi, hi, lo_t, arguments.PREC);
+            slong digits = arguments.DIGITS;
+            digits += arf_get_si(&u->mid, 0);
 
-        acb_t zz;
-        acb_init(zz);
+            if (arguments.verbose) {
+                flint_fprintf(stderr, "asymptotic zero location = ");
+                arb_fprintd(stderr, tt, digits);
+                flint_fprintf(stderr, "\n");
+            }
 
-        arb_pos_inf(lo_t);
-        arb_neg_inf(hi_t);
+            arb_set_d(m, -0.5);
+            arb_add(m, m0, m, arguments.PREC);
+            arb_set(m_lo, m);
+            arb_set(m_hi, m);
 
-        arb_pos_inf(lo);
-        arb_neg_inf(hi);
+            arb_t lo;
+            arb_t hi;
+            arb_t lo_t;
+            arb_t hi_t;
 
-        arb_set_d(step, arguments.w0);
+            arb_init(lo);
+            arb_init(hi);
+            arb_init(lo_t);
+            arb_init(hi_t);
 
-        arb_sub(lo_t, tt, step, arguments.PREC);
-        arb_add(hi_t, tt, step, arguments.PREC);
+            // tt / 2 PI
+            arb_const_pi(lo_t, arguments.PREC);
+            arb_div(hi, tt, lo_t, arguments.PREC);
+            arb_set_d(lo_t, 0.5);
+            arb_mul(hi, hi, lo_t, arguments.PREC);
 
-        zero_count_approx(lo, lo_t, arguments.k, arguments.PREC);
-        zero_count_approx(hi, hi_t, arguments.k, arguments.PREC);
+            acb_t zz;
+            acb_init(zz);
 
-        if (arb_gt(lo, m) || arb_lt(hi, m) || arb_lt(hi, lo)) {
-            iter_print(lo_t, lo, hi_t, hi, digits, arguments.verbose);
-            flint_fprintf(stderr, "please increase the window\n");
-        } else {
+            arb_pos_inf(lo_t);
+            arb_neg_inf(hi_t);
 
-            arb_t mid_t;
-            arb_t mid;
-            arb_init(mid);
-            arb_init(mid_t);
+            arb_pos_inf(lo);
+            arb_neg_inf(hi);
 
-            while (1) {
+            arb_set_d(step, arguments.w0);
+
+            arb_sub(lo_t, tt, step, arguments.PREC);
+            arb_add(hi_t, tt, step, arguments.PREC);
+
+            zero_count_approx(lo, lo_t, arguments.k, arguments.PREC);
+            zero_count_approx(hi, hi_t, arguments.k, arguments.PREC);
+
+            if (arb_gt(lo, m) || arb_lt(hi, m) || arb_lt(hi, lo)) {
+                iter_print(lo_t, lo, hi_t, hi, digits, arguments.verbose);
+                flint_fprintf(stderr, "please increase the window\n");
+            } else {
+
+                arb_t mid_t;
+                arb_t mid;
+                arb_init(mid);
+                arb_init(mid_t);
+
+                while (1) {
+
+                    iter_print(lo_t, lo, hi_t, hi, digits, arguments.verbose);
+
+                    arb_add(mid_t, lo_t, hi_t, arguments.PREC);
+                    arb_set_d(mm, 0.5);
+                    arb_mul(mid_t, mid_t, mm, arguments.PREC);
+
+                    zero_count_approx(mid, mid_t, arguments.k, arguments.PREC);
+
+                    arb_zero(mm);
+                    if (arb_gt(mid, m)) {
+                        arb_set(hi_t, mid_t);
+                        arb_set(hi, mid);
+                    } else {
+                        arb_set(lo_t, mid_t);
+                        arb_set(lo, mid);
+                    }
+
+                    arb_sub(mm, hi_t, lo_t, arguments.PREC);
+                    arb_set_d(u, arguments.step0);
+                    if (arb_lt(mm, u)) break;
+
+                }
 
                 iter_print(lo_t, lo, hi_t, hi, digits, arguments.verbose);
 
-                arb_add(mid_t, lo_t, hi_t, arguments.PREC);
-                arb_set_d(mm, 0.5);
-                arb_mul(mid_t, mid_t, mm, arguments.PREC);
-
-                zero_count_approx(mid, mid_t, arguments.k, arguments.PREC);
-
-                arb_zero(mm);
-                if (arb_gt(mid, m)) {
-                    arb_set(hi_t, mid_t);
-                    arb_set(hi, mid);
-                } else {
-                    arb_set(lo_t, mid_t);
-                    arb_set(lo, mid);
+                if (arguments.verbose) {
+                    flint_fprintf(stderr, "argument s = \t");
+                    arb_set_d(lo_t, 0.5);
+                    acb_set_arb_arb(zz, lo_t, mid_t);
+                    acb_fprintd(stderr, zz, digits);
+                    flint_fprintf(stderr, "\n");
                 }
+                if (arguments.eval > 0) {
+                    flint_fprintf(stderr, "value    z = \t");
+                    zeta(zz, mid_t, arguments.ZETA_PREC);
+                    acb_fprintd(stderr, zz, digits);
+                    flint_fprintf(stderr, "\n");
+                }
+                arb_set_d(lo_t, 0.005);
 
-                arb_sub(mm, hi_t, lo_t, arguments.PREC);
-                arb_set_d(u, arguments.step0);
-                if (arb_lt(mm, u)) break;
+                arf_fprintd(stdout, &mid_t->mid, digits);
+                flint_fprintf(stdout, "\n");
+                fflush(stdout);
 
+                arb_one(m);
+                arb_add(m0, m0, m, arguments.PREC);
+
+                arb_clear(mid);
+                arb_clear(mid_t);
             }
 
-            iter_print(lo_t, lo, hi_t, hi, digits, arguments.verbose);
+            arb_clear(lo);
+            arb_clear(hi);
+            arb_clear(lo_t);
+            arb_clear(hi_t);
+            acb_clear(zz);
 
-            if(arguments.verbose) {
-                flint_fprintf(stderr, "argument s = \t");
-                arb_set_d(lo_t, 0.5);
-                acb_set_arb_arb(zz, lo_t, mid_t);
-                acb_fprintd(stderr, zz, digits);
-                flint_fprintf(stderr, "\n");
-            }
-            if (arguments.eval > 0) {
-                flint_fprintf(stderr, "value    z = \t");
-                zeta(zz, mid_t, arguments.ZETA_PREC);
-                acb_fprintd(stderr, zz, digits);
-                flint_fprintf(stderr, "\n");
-            }
-            arb_set_d(lo_t, 0.005);
-
-            arf_fprintd(stdout, &mid_t->mid, digits);
-            flint_fprintf( stdout, "\n");
-            fflush(stdout);
-
-            arb_one(m);
-            arb_add(m0, m0, m, arguments.PREC);
-
-            arb_clear(mid);
-            arb_clear(mid_t);
         }
-
-        arb_clear(lo);
-        arb_clear(hi);
-        arb_clear(lo_t);
-        arb_clear(hi_t);
-        acb_clear(zz);
-
     }
 
     arb_clear(m);
