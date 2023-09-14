@@ -296,6 +296,76 @@ void nt(arb_ptr out, arb_srcptr t, slong PREC) {
     arb_clear(b);
 }
 
+void sawp(arb_ptr out, arb_srcptr q, arb_srcptr x, slong PREC) {
+    arb_t a;
+    arb_t b;
+    arb_t c;
+    arb_t d;
+    arb_t xx;
+    arb_t pi;
+    arb_t sqrt_q;
+    arb_t log_q;
+
+    arb_init(pi);
+    arb_init(a);
+    arb_init(b);
+    arb_init(c);
+    arb_init(d);
+    arb_init(xx);
+    arb_init(sqrt_q);
+    arb_init(log_q);
+
+    arb_sqrt(sqrt_q, q, PREC);
+    arb_log(log_q, q, PREC);
+    arb_const_pi(pi, PREC);
+
+    //a == pi p - pi sqrt@p
+    arb_mul(a, pi, q, PREC);
+    arb_mul(b, pi, sqrt_q, PREC);
+    arb_sub(a, a, b, PREC);
+
+    //Mod[x, 2 PI / Log[q], -a/(2 p Log[p])]
+    arb_mul_ui(b, pi, 2, PREC);
+    arb_div(b, b, log_q, PREC);
+
+    arb_div(c, a, log_q, PREC);
+    arb_div(c, c, q, PREC);
+    arb_div_ui(d, c, 2, PREC);
+    arb_add(xx, x, d, PREC);
+
+    arb_div(c, xx, b, PREC);
+    arb_floor(c, c, PREC);
+    arb_mul(c, c, b, PREC);
+    arb_sub(c, xx, c, PREC);
+    arb_sub(c, c, d, PREC);
+
+    arb_mul(b, c, log_q, PREC);
+    arb_mul(b, b, sqrt_q, PREC);
+    arb_div(b, b, a, PREC);
+
+    arb_div(a, pi, log_q, PREC);
+    arb_sub(a, a, c, PREC);
+    arb_mul(a, a, log_q, PREC);
+    arb_div(a, a, pi, PREC);
+    arb_sub_ui(c, q, 1, PREC);
+    arb_div(a, a, c, PREC);
+    arb_sub_ui(c, sqrt_q, 1, PREC);
+    arb_mul(a, a, c, PREC);
+    arb_min(a, a, b, PREC);
+    arb_neg(a, a);
+    arb_set(out, a);
+
+    arb_clear(a);
+    arb_clear(b);
+    arb_clear(pi);
+    arb_clear(c);
+    arb_clear(d);
+    arb_clear(xx);
+    arb_clear(sqrt_q);
+    arb_clear(log_q);
+
+}
+
 void nt_inv(arb_ptr out, arb_srcptr m, slong PREC) {
     arb_t x;
     arb_t a;
@@ -385,10 +455,20 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
             arb_neg(z, z);
         }
 #if CUBIC == 1
-        arb_set_d(y, i);
-        arb_pow(y, y, v, PREC);
-        arb_mul_ui(y, y, 3, PREC);
-        arb_inv(x, y, PREC);
+        sawp(x, q, x, PREC);
+        arb_abs(x, x);
+        arb_sqrt(y, q, PREC);
+        arb_mul(x, x, y, PREC);
+        arb_set_ui(y, i);
+        arb_inv(y, y, PREC);
+        arb_mul_ui(y, y, 2, PREC);
+        arb_div_ui(y, y, 3, PREC);
+        arb_neg(y, y);
+        arb_add_ui(y, y, 1, PREC);
+        arb_mul(x, x, y, PREC);
+        arb_one(y);
+        arb_div_ui(y, y, 2, PREC);
+        arb_sub(x, y, x, PREC);
 
         arb_set_d(y, 0.5);
         arb_sub(y, y, x, PREC);
