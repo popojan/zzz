@@ -436,12 +436,12 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
 #endif
 
     for(int i = 1; i <= k; ++i) {
-        arb_set_d(q, n_nth_prime(i));
+        arb_set_ui(q, n_nth_prime(i));
 
         arb_div(att, t, q, PREC);
         arb_sqrt(att,att,PREC);
         arb_neg(att, att);
-        arb_exp(att, att, PREC);;
+        arb_exp(att, att, PREC);
         arb_one(w);
         arb_sub(att, w, att, PREC);
 
