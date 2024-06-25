@@ -1,5 +1,8 @@
-#include "arb/acb.h"
-#include <argp.h>
+#include <flint/arb.h>
+#include <flint/acb.h>
+#include "flint/ulong_extras.h"
+#include <stdlib.h>
+#include "argp.h"
 
 #define CUBIC 1
 
@@ -254,6 +257,47 @@ void wave3(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
     arb_clear(log_q);
 }
 
+void wave_complex(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
+     //-((I Log[1 - p^(-(1/2) + I x)])/\[Pi])
+    acb_t x;
+    acb_t y;
+    acb_t z;
+    arb_t a;
+    arb_init(a);
+
+    acb_init(x);
+    acb_init(y);
+    acb_init(z);
+
+    arb_const_pi(a, PREC);
+    arb_inv(a, a, PREC);
+    acb_onei(x);
+    acb_neg(x, x);
+    acb_mul_arb(x, x, a, PREC); // -I/Pi
+
+    acb_one(y);
+    acb_div_ui(y, y, 2, PREC);
+    acb_neg(y, y);
+
+    acb_onei(z);
+    acb_mul_arb(z, z, t, PREC);
+    acb_add(z, z, y, PREC);
+
+    acb_set_arb(y, q);
+    acb_pow(y, y, z, PREC);
+    acb_neg(y, y);
+
+    acb_add_ui(y, y, 1, PREC);
+    acb_log(y, y, PREC);
+    acb_mul(y, y, x, PREC);
+
+    arb_set(out, acb_real_ptr(y));
+
+    arb_clear(a);
+    acb_clear(z);
+    acb_clear(y);
+    acb_clear(x);
+}
 void zeta(acb_ptr out, arb_srcptr t, slong ZETA_PREC) {
     acb_t s;
     acb_t z;
@@ -402,6 +446,28 @@ void nt_inv(arb_ptr out, arb_srcptr m, slong PREC) {
     arb_clear(b);
     arb_clear(den);
     arb_clear(nom);
+}
+
+void zero_count_exact(arb_ptr out,  arb_srcptr t, slong k, slong PREC) {
+    arb_t u;
+    arb_t q;
+    arb_t z;
+    arb_init(u);
+    arb_init(q);
+    arb_init(z);
+
+    nt(u, t, PREC);
+
+    for(int i = 1; i <= k; ++i) {
+        arb_set_ui(q, n_nth_prime(i));
+        wave_complex(z, q, t, PREC);
+        arb_add(u, u, z, PREC);
+    }
+    arb_set(out, u);
+
+    arb_clear(u);
+    arb_clear(q);
+    arb_clear(z);
 }
 
 void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
@@ -641,7 +707,7 @@ int main(int argc, char *argv[])
         arb_add(m, m, m0, arguments.PREC);
 
         for (; arb_lt(tx, m); arb_add(tx, tx, stp, arguments.PREC)) {
-            zero_count_approx(zc, tx, arguments.k, arguments.PREC);
+            zero_count_exact(zc, tx, arguments.k, arguments.PREC);
             arf_printd(&tx->mid, arguments.DIGITS);
             flint_printf("\t");
             arf_printd(&zc->mid, arguments.DIGITS);
@@ -704,8 +770,8 @@ int main(int argc, char *argv[])
             arb_sub(lo_t, tt, step, arguments.PREC);
             arb_add(hi_t, tt, step, arguments.PREC);
 
-            zero_count_approx(lo, lo_t, arguments.k, arguments.PREC);
-            zero_count_approx(hi, hi_t, arguments.k, arguments.PREC);
+            zero_count_exact(lo, lo_t, arguments.k, arguments.PREC);
+            zero_count_exact(hi, hi_t, arguments.k, arguments.PREC);
 
             if (arb_gt(lo, m) || arb_lt(hi, m) || arb_lt(hi, lo)) {
                 iter_print(lo_t, lo, hi_t, hi, digits, arguments.verbose);
@@ -725,7 +791,7 @@ int main(int argc, char *argv[])
                     arb_set_d(mm, 0.5);
                     arb_mul(mid_t, mid_t, mm, arguments.PREC);
 
-                    zero_count_approx(mid, mid_t, arguments.k, arguments.PREC);
+                    zero_count_exact(mid, mid_t, arguments.k, arguments.PREC);
 
                     arb_zero(mm);
                     if (arb_gt(mid, m)) {
