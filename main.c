@@ -452,6 +452,9 @@ void zero_count_exact(arb_ptr out,  arb_srcptr t, slong k, slong PREC) {
     arb_t u;
     arb_t q;
     arb_t z;
+    arb_t att;
+    arb_init(att);
+
     arb_init(u);
     arb_init(q);
     arb_init(z);
@@ -461,6 +464,15 @@ void zero_count_exact(arb_ptr out,  arb_srcptr t, slong k, slong PREC) {
     for(int i = 1; i <= k; ++i) {
         arb_set_ui(q, n_nth_prime(i));
         wave_complex(z, q, t, PREC);
+
+        arb_div(att, t, q, PREC);
+        arb_sqrt(att,att,PREC);
+        arb_neg(att, att);
+        arb_exp(att, att, PREC);
+        arb_sub_ui(att, att, 1, PREC);
+        arb_neg(att, att);
+
+        arb_mul(z, z, att, PREC);
         arb_add(u, u, z, PREC);
     }
     arb_set(out, u);
@@ -468,6 +480,7 @@ void zero_count_exact(arb_ptr out,  arb_srcptr t, slong k, slong PREC) {
     arb_clear(u);
     arb_clear(q);
     arb_clear(z);
+    arb_clear(att);
 }
 
 void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
