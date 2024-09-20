@@ -26,6 +26,8 @@ fast approximation of large Riemann zeta zeros
 
 ## Zero counting function approximation
 
+Note: obsolete inner sum approximation, not used any more.
+
 Combines quadratic and cubic spline with correct frequency and tangents to match the amplitude.
 
 ![waves](doc/waves.png)
@@ -36,7 +38,7 @@ Combines quadratic and cubic spline with correct frequency and tangents to match
 
 ## Error distribution
 
-In comparison with k=0 (basic Lambert W approximation).
+In comparison with k=-∞ (basic Lambert W approximation).
 
 ![errors](doc/errors.png)
 
@@ -51,13 +53,13 @@ $ time ./zzz -ve -k 1000 1e12 +1
 ```
 
 ```
-argument s = 	(0.500000000000000000 + 267653395648.847393j)  +/-  (0, 1.05e-65j)
-value    z = 	(0.0166724860775396361 + 0.00559081254510210870j)  +/-  (1.17e-20, 1.05e-20j)
-267653395648.847393
+argument s =    (0.500000000000000000 + 267653395648.844684j)  +/-  (0, 1.05e-65j)
+value    z =    (0.355290959100415380 + 0.132397324302526229j)  +/-  (3.70e-20, 2.34e-20j)
+267653395648.844684
 
-real	0m0.425s
-user	0m0.418s
-sys	0m0.004s
+real    0m0.470s
+user    0m0.456s
+sys     0m0.007s
 ```
 
 ## Zero # 10^36 + 42420637374017961984
@@ -67,18 +69,18 @@ sys	0m0.004s
 ```
 
 ```text
-81029194732694548890047854481676713.010104
+81029194732694548890047854481676713.009431
 
-real	0m3.633s
-user	0m3.620s
-sys	0m0.002s
+real    0m2.381s
+user    0m2.366s
+sys     0m0.005s
 ```
 
 ```
-81029194732694548890047854481676712.94005   prev approximate     #10^36+42420637374017961983
+81029194732694548890047854481676712.94002   prev approximate     #10^36+42420637374017961983
 81029194732694548890047854481676712.98790          published     #10^36+42420637374017961984
-81029194732694548890047854481676713.01010        approximate     #10^36+42420637374017961984
-81029194732694548890047854481676713.08837   next approximate     #10^36+42420637374017961985
+81029194732694548890047854481676713.00943        approximate     #10^36+42420637374017961984
+81029194732694548890047854481676713.08748   next approximate     #10^36+42420637374017961985
 ```
 
 ## Chebyshev Psi Exact Formula
