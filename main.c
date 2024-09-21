@@ -298,6 +298,34 @@ void wave_complex(arb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
     acb_clear(y);
     acb_clear(x);
 }
+
+void wave_complex_opt(acb_ptr out, arb_srcptr q, arb_srcptr t, slong PREC) {
+     // Log[1 - p^(-(1/2) + I x)]
+    acb_t y;
+    acb_t z;
+
+    acb_init(y);
+    acb_init(z);
+
+    acb_one(y);
+    acb_div_ui(y, y, 2, PREC);
+    acb_neg(y, y);
+
+    acb_onei(z);
+    acb_mul_arb(z, z, t, PREC);
+    acb_add(z, z, y, PREC);
+
+    acb_set_arb(y, q);
+    acb_pow(y, y, z, PREC);
+    acb_neg(y, y);
+
+    acb_add_ui(y, y, 1, PREC);
+    acb_log(out, y, PREC);
+
+    acb_clear(z);
+    acb_clear(y);
+}
+
 void zeta(acb_ptr out, arb_srcptr t, slong ZETA_PREC) {
     acb_t s;
     acb_t z;
@@ -449,21 +477,25 @@ void nt_inv(arb_ptr out, arb_srcptr m, slong PREC) {
 }
 
 void zero_count_exact(arb_ptr out,  arb_srcptr t, slong k, slong PREC) {
-    arb_t u;
+    arb_t a;
+    acb_t x;
+    acb_t u;
     arb_t q;
-    arb_t z;
+    acb_t z;
     arb_t att;
+
     arb_init(att);
-
-    arb_init(u);
+    arb_init(a);
+    acb_init(x);
+    acb_init(u);
     arb_init(q);
-    arb_init(z);
+    acb_init(z);
 
-    nt(u, t, PREC);
+    acb_zero(u);
 
     for(int i = 1; i <= k; ++i) {
         arb_set_ui(q, n_nth_prime(i));
-        wave_complex(z, q, t, PREC);
+        wave_complex_opt(z, q, t, PREC);
 
         arb_div(att, t, q, PREC);
         arb_sqrt(att,att,PREC);
@@ -472,14 +504,28 @@ void zero_count_exact(arb_ptr out,  arb_srcptr t, slong k, slong PREC) {
         arb_sub_ui(att, att, 1, PREC);
         arb_neg(att, att);
 
-        arb_mul(z, z, att, PREC);
-        arb_add(u, u, z, PREC);
+        acb_mul_arb(z, z, att, PREC);
+        acb_add(u, u, z, PREC);
     }
-    arb_set(out, u);
 
-    arb_clear(u);
+    arb_const_pi(a, PREC);
+    arb_inv(a, a, PREC);
+    acb_onei(x);
+    acb_neg(x, x);
+    acb_mul_arb(x, x, a, PREC); // -I/Pi
+
+    acb_mul(u, u, x, PREC);
+
+    nt(a, t, PREC);
+    acb_add_arb(u, u, a, PREC);
+
+    arb_set(out, acb_real_ptr(u));
+
+    arb_clear(a);
+    acb_clear(x);
+    acb_clear(u);
     arb_clear(q);
-    arb_clear(z);
+    acb_clear(z);
     arb_clear(att);
 }
 
@@ -757,26 +803,13 @@ int main(int argc, char *argv[])
             arb_t hi;
             arb_t lo_t;
             arb_t hi_t;
+            acb_t zz;
 
             arb_init(lo);
             arb_init(hi);
             arb_init(lo_t);
             arb_init(hi_t);
-
-            // tt / 2 PI
-            arb_const_pi(lo_t, arguments.PREC);
-            arb_div(hi, tt, lo_t, arguments.PREC);
-            arb_set_d(lo_t, 0.5);
-            arb_mul(hi, hi, lo_t, arguments.PREC);
-
-            acb_t zz;
             acb_init(zz);
-
-            arb_pos_inf(lo_t);
-            arb_neg_inf(hi_t);
-
-            arb_pos_inf(lo);
-            arb_neg_inf(hi);
 
             arb_set_d(step, arguments.w0);
 
