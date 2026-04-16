@@ -3,6 +3,7 @@
 #include "flint/ulong_extras.h"
 #include <stdlib.h>
 #include "argp.h"
+#include "ghy.h"
 
 #define CUBIC 1
 
@@ -529,6 +530,42 @@ void zero_count_exact(arb_ptr out,  arb_srcptr t, slong k, slong PREC) {
     arb_clear(att);
 }
 
+// GHY partial-Euler-only counting function: F_B(T) = N_0(T) + arg P_X(1/2+iT) / pi
+// where P_X is the Gonek-Hughes-Young partial Euler factor. Zeta-evaluation-free
+// and primes-only, like zero_count_exact, but with the heuristic damping replaced
+// by the rigorous GHY smooth cutoff (Thm 1 of Gonek-Hughes-Young 2007).
+// Parameter X is the prime-power cutoff; typically pass X = p_k to match the
+// "k primes" specification of zero_count_exact.
+void zero_count_ghy(arb_ptr out, arb_srcptr t, ulong X, slong PREC) {
+    acb_t s;
+    acb_t logp;
+    arb_t pi;
+    arb_t n0;
+
+    acb_init(s);
+    acb_init(logp);
+    arb_init(pi);
+    arb_init(n0);
+
+    arb_const_pi(pi, PREC);
+
+    // s = 1/2 + i t
+    arb_one(acb_realref(s));
+    arb_div_ui(acb_realref(s), acb_realref(s), 2, PREC);
+    arb_set(acb_imagref(s), t);
+
+    ghy_log_px(logp, s, X, PREC);
+
+    ghy_n0_smooth(n0, t, PREC);
+    arb_div(out, acb_imagref(logp), pi, PREC);
+    arb_add(out, out, n0, PREC);
+
+    acb_clear(s);
+    acb_clear(logp);
+    arb_clear(pi);
+    arb_clear(n0);
+}
+
 void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
     arb_t u;
     arb_t w;
@@ -639,6 +676,7 @@ static struct argp_option options[] = {
         { "digits", 'd', "DIGITS", 0, "extra digits for number formatting [default 6]"},
         { "verbose", 'v', 0, 0, "verbose progress output"},
         { "debug", 'g', 0, 0, "debug counting function from <N> to <N+offset> in <count> steps"},
+        { "ghy",   'G', 0, 0, "use GHY partial Euler P_X (X = p_k) instead of heuristic damping"},
         { 0 }
 };
 
@@ -652,6 +690,7 @@ struct arguments {
     slong DIGITS;
     slong verbose;
     slong debug;
+    slong ghy;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -667,6 +706,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 'd': arguments->DIGITS = atol(arg); break;
         case 'v': arguments->verbose = 1; break;
         case 'g': arguments->debug = 1; break;
+        case 'G': arguments->ghy = 1; break;
         case ARGP_KEY_ARG: return 0;
         default: return ARGP_ERR_UNKNOWN;
     }
@@ -711,9 +751,16 @@ int main(int argc, char *argv[])
     arguments.eval = 0;
     arguments.verbose = 0;
     arguments.debug = 0;
+    arguments.ghy = 0;
 
     int arg_index = 1;
     argp_parse(&argp, argc, argv, ARGP_NO_ARGS, &arg_index, &arguments);
+
+    // GHY mode: resolve X = p_k so the cost matches the heuristic's "k primes"
+    ulong ghy_X = 0;
+    if (arguments.ghy && arguments.k > 0) {
+        ghy_X = n_nth_prime(arguments.k);
+    }
 
     arb_t m;
     arb_t u;
@@ -766,7 +813,8 @@ int main(int argc, char *argv[])
         arb_add(m, m, m0, arguments.PREC);
 
         for (; arb_lt(tx, m); arb_add(tx, tx, stp, arguments.PREC)) {
-            zero_count_exact(zc, tx, arguments.k, arguments.PREC);
+            if (arguments.ghy) zero_count_ghy(zc, tx, ghy_X, arguments.PREC);
+            else               zero_count_exact(zc, tx, arguments.k, arguments.PREC);
             arf_printd(&tx->mid, arguments.DIGITS);
             flint_printf("\t");
             arf_printd(&zc->mid, arguments.DIGITS);
@@ -816,8 +864,13 @@ int main(int argc, char *argv[])
             arb_sub(lo_t, tt, step, arguments.PREC);
             arb_add(hi_t, tt, step, arguments.PREC);
 
-            zero_count_exact(lo, lo_t, arguments.k, arguments.PREC);
-            zero_count_exact(hi, hi_t, arguments.k, arguments.PREC);
+            if (arguments.ghy) {
+                zero_count_ghy(lo, lo_t, ghy_X, arguments.PREC);
+                zero_count_ghy(hi, hi_t, ghy_X, arguments.PREC);
+            } else {
+                zero_count_exact(lo, lo_t, arguments.k, arguments.PREC);
+                zero_count_exact(hi, hi_t, arguments.k, arguments.PREC);
+            }
 
             if (arb_gt(lo, m) || arb_lt(hi, m) || arb_lt(hi, lo)) {
                 iter_print(lo_t, lo, hi_t, hi, digits, arguments.verbose);
@@ -837,7 +890,8 @@ int main(int argc, char *argv[])
                     arb_set_d(mm, 0.5);
                     arb_mul(mid_t, mid_t, mm, arguments.PREC);
 
-                    zero_count_exact(mid, mid_t, arguments.k, arguments.PREC);
+                    if (arguments.ghy) zero_count_ghy(mid, mid_t, ghy_X, arguments.PREC);
+                    else               zero_count_exact(mid, mid_t, arguments.k, arguments.PREC);
 
                     arb_zero(mm);
                     if (arb_gt(mid, m)) {
