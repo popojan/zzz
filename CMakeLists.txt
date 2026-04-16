@@ -35,3 +35,5 @@ ENDIF()
 
 add_executable(zzz main.c)
 add_executable(zproxy zproxy.c)
+add_executable(zghy zghy.c)
+target_link_libraries(zghy m)
