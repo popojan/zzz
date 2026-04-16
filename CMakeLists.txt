@@ -34,3 +34,4 @@ ELSE()
 ENDIF()
 
 add_executable(zzz main.c)
+add_executable(zproxy zproxy.c)
