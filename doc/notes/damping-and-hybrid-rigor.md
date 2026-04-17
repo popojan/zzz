@@ -198,14 +198,14 @@ Ordered by dependency. Tasks are self‑contained; pick one at a time.
 ### Task R2 — Export the finite proxy `Z_k(s, T)` as a first‑class object
 **Goal:** make "what zzz actually computes" visible.
 - New small binary `zproxy` (or a `--proxy` flag on `zzz`) that evaluates `Z_k(σ + iT, T)` on a grid of `σ` and `T`, using the same code path as `zero_count_exact` but exposing magnitude and argument.
-- Plot `|Z_k(1/2 + iT, T)|` over `T ∈ [10, 100]` and mark `ζ`‑zeros from `ZetaZero[]` for comparison. Ship plot in `papers/`.
+- Plot `|Z_k(1/2 + iT, T)|` over `T ∈ [10, 100]` and mark `ζ`‑zeros from `ZetaZero[]` for comparison. Ship plot in `doc/ghy/`.
 - Output: empirical answer to the user's question, "what zeros are these?"
 
 ### Task R3 — Read and extract explicit constants from GHY 2007
 **Goal:** pin down the kernel `U` and the `E`‑bound constants.
 - Target Theorem 1 and its proof (the explicit form of `E`).
 - Choose a specific mollifier `u` — GHY's canonical `u(x) = (some C^∞_c bump)` or Vaaler's. Compute `U(z)` for that `u` to high precision; tabulate or write a series.
-- Produce a tiny Wolfram notebook `papers/ghy-kernel.wls` that:
+- Produce a tiny Wolfram notebook `doc/ghy/ghy-kernel.wls` that:
   - plots `U(z)` vs `|z|`,
   - verifies `U(0)`, `U(iπ)` etc. against the paper,
   - provides `fmt`ed numeric coefficients for C implementation.
@@ -282,4 +282,4 @@ R1–R2 are one‑afternoon jobs and produce tangible artifacts immediately. R3 
 - Goldston, "On the function `S(T)` in the theory of the Riemann zeta‑function", *J. Number Theory* **27** (1987), 149–177.
 - Carneiro, Chandee, Milinovich, "Bounding `S(T)` and `S_1(T)` on the Riemann hypothesis", *Math. Ann.* **356** (2013), 939–968.
 - Carneiro, Chirre, Milinovich, "Bandlimited approximations and estimates for the Riemann zeta‑function", *Publ. Mat.* **63** (2022).
-- This repo: `main.c:479–530` (`zero_count_exact`), `papers/rigor-backlog.md`, `papers/test-function-search.wls`.
+- This repo: `main.c:479–530` (`zero_count_exact`), `doc/notes/rigor-backlog.md`, `doc/heuristic/test-function-search.wls`.

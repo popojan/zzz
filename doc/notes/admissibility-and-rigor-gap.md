@@ -1,6 +1,6 @@
 # Weil admissibility, provable bounds under RH, and the gap between A and B
 
-*Personal synthesis note. Companion to `damping-and-hybrid-rigor.md` and `rigor-bound-b.md`.*
+*Personal synthesis note. Companion to `doc/notes/damping-and-hybrid-rigor.md` and `doc/notes/rigor-bound-b.md`.*
 
 ---
 
@@ -19,11 +19,11 @@
 
 The three methods under comparison:
 
-| | formula | input | rigor |
-|---|---|---|---|
-| **A** | $F_A(T) = N_0(T) + \tfrac{1}{\pi}\operatorname{Im}\sum_{p \le p_k}\bigl(1-e^{-\sqrt{T/p}}\bigr)\log(1-p^{-1/2+iT})$ | primes | none |
-| **B** | $F_B(T) = N_0(T) + \tfrac{1}{\pi}\operatorname{Im}\log P_X(\tfrac{1}{2}+iT)$ | primes | GHY + Goldston |
-| **C** | $F_\text{hybrid}(T) = N_0(T) + \tfrac{1}{\pi}\operatorname{Im}\log\bigl[P_X\cdot Z_X\bigr]$ | primes + nearby zeros | GHY |
+|       | formula                                                                                                             | input                 | rigor          |
+| ----- | ------------------------------------------------------------------------------------------------------------------- | --------------------- | -------------- |
+| **A** | $F_A(T) = N_0(T) + \tfrac{1}{\pi}\operatorname{Im}\sum_{p \le p_k}\bigl(1-e^{-\sqrt{T/p}}\bigr)\log(1-p^{-1/2+iT})$ | primes                | none           |
+| **B** | $F_B(T) = N_0(T) + \tfrac{1}{\pi}\operatorname{Im}\log P_X(\tfrac{1}{2}+iT)$                                        | primes                | GHY + Goldston |
+| **C** | $F_\text{hybrid}(T) = N_0(T) + \tfrac{1}{\pi}\operatorname{Im}\log\bigl[P_X\cdot Z_X\bigr]$                         | primes + nearby zeros | GHY            |
 
 ---
 
@@ -199,7 +199,7 @@ Any of these would turn B from "correct up to loose constant" into "correct up t
 - `main.c` (A and B in one binary, flagged by `--ghy`)
 - `ghy.c`, `ghy.h` (shared GHY primitives)
 - `zghy.c`, `zhad.c`, `zhybrid.c` (P_X, Z_X, and full hybrid evaluators)
-- `papers/ab-scan.wls` (the accuracy scan above)
-- `papers/damping-and-hybrid-rigor.md` (the original plan)
-- `papers/rigor-bound-b.md` (the numerical bound confrontation)
-- `papers/ghy-kernel.wls` (the Hadamard kernel $U(z) \to E_1(z)$ derivation)
+- `doc/ghy/ab-scan.wls` (the accuracy scan above)
+- `doc/notes/damping-and-hybrid-rigor.md` (the original plan)
+- `doc/notes/rigor-bound-b.md` (the numerical bound confrontation)
+- `doc/ghy/ghy-kernel.wls` (the Hadamard kernel $U(z) \to E_1(z)$ derivation)

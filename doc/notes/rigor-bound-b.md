@@ -1,6 +1,6 @@
 # Rigorous error bound for method B (`zzz --ghy`)
 
-**Goal.** State what can be *proved* about the accuracy of $F_B(T)$ as an approximation to $N(T)$, and compare that provable bound to the empirical data from `papers/ab-scan.wls`.
+**Goal.** State what can be *proved* about the accuracy of $F_B(T)$ as an approximation to $N(T)$, and compare that provable bound to the empirical data from `doc/ghy/ab-scan.wls`.
 
 **Setup.** All statements assume RH. The object of interest is
 
@@ -165,8 +165,8 @@ Any of these would turn B from "same accuracy as A, but rigorous with loose cons
 - **A** (heuristic): `zzz` default
 - **B** (partial Euler): `zzz --ghy` (commit `7ab0d2de`)
 - **C** (hybrid): `zhybrid` (commit `4da27896`)
-- Scan: `papers/ab-scan.wls` (commit `92f1e9b2`)
-- This document: companion to `papers/damping-and-hybrid-rigor.md` §6, §7.
+- Scan: `doc/ghy/ab-scan.wls` (commit `92f1e9b2`)
+- This document: companion to `doc/notes/damping-and-hybrid-rigor.md` §6, §7.
 
 ---
 
