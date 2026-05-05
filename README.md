@@ -10,6 +10,8 @@ fast approximation of large Riemann zeta zeros
                              approximate zero location
   -g, --debug                debug counting function from <N> to <N+offset> in
                              <count> steps
+  -G, --ghy                  use GHY partial Euler P_X (X = p_k) instead of
+                             heuristic damping
   -k, --k=K                  use first k primes for zero counting function
                              approximation [default 100]
   -p, --precision=PREC       arb precision for counting function approximation
@@ -23,6 +25,35 @@ fast approximation of large Riemann zeta zeros
       --usage                Give a short usage message
   -V, --version              Print program version
 ```
+
+## Counting modes
+
+`zzz` exposes two zeta-evaluation-free counting functions; both bisect for
+the n-th zero with the same driver and CLI.
+
+**default (heuristic).**
+$F_A(T) = N_0(T) + \tfrac{1}{\pi}\operatorname{Im}\sum_{p\le p_k}(1-e^{-\sqrt{T/p}})\log(1-p^{-1/2+iT})$.
+Smooth damping that pre-suppresses primes with $p\gtrsim T$. No provable
+error bound; empirically `|F_A − N| ~ 10⁻²` at `k = 1000` across the scan.
+
+**`--ghy` (rigorous).**
+$F_B(T) = N_0(T) + \tfrac{1}{\pi}\arg P_X(\tfrac{1}{2}+iT)$ with
+$\log P_X = \sum_{p^m\le X} 1/(m\,p^{ms})$ and $X = p_k$
+(Gonek–Hughes–Young 2007, eq. 6). Carries the bound
+$|F_B - N| \le \tfrac{1}{\pi}\tfrac{\log T}{\log X} + O(\tfrac{\log X}{\sqrt X})$
+under RH (Goldston 1987 + GHY Thm 1).
+
+The two methods are empirically equivalent in the production regime
+(`T ≳ 10⁶`, `k ≲ 10⁴`); see `doc/notes/rigor-bound-b.md` for the numerical
+confrontation. **Validity caveat for `--ghy`:** at very low zeros
+(`T ≲ 100`), B is only inside its rigor regime while `k ≲ π(T log T)`;
+raising k beyond that drifts B away from the true zero. The heuristic A
+self-limits via its damping and stays accurate. See
+`doc/notes/low-zero-regime.md`.
+
+Auxiliary binaries `zhybrid`, `zghy`, `zhad`, `zproxy` evaluate the related
+GHY proxies on grids; `zhybrid` implements the full hybrid `P_X · Z_X` with
+seed zeros (rigorous error `O(log X / √X)`).
 
 ## Zero counting function approximation
 
