@@ -31,29 +31,49 @@ fast approximation of large Riemann zeta zeros
 `zzz` exposes two zeta-evaluation-free counting functions; both bisect for
 the n-th zero with the same driver and CLI.
 
-**default (heuristic).**
-$F_A(T) = N_0(T) + \tfrac{1}{\pi}\operatorname{Im}\sum_{p\le p_k}(1-e^{-\sqrt{T/p}})\log(1-p^{-1/2+iT})$.
-Smooth damping that pre-suppresses primes with $p\gtrsim T$. No provable
-error bound; empirically `|F_A − N| ~ 10⁻²` at `k = 1000` across the scan.
+### Default (heuristic)
 
-**`--ghy` (rigorous).**
-$F_B(T) = N_0(T) + \tfrac{1}{\pi}\arg P_X(\tfrac{1}{2}+iT)$ with
-$\log P_X = \sum_{p^m\le X} 1/(m\,p^{ms})$ and $X = p_k$
-(Gonek–Hughes–Young 2007, eq. 6). Carries the bound
-$|F_B - N| \le \tfrac{1}{\pi}\tfrac{\log T}{\log X} + O(\tfrac{\log X}{\sqrt X})$
-under RH (Goldston 1987 + GHY Thm 1).
+$$
+F_A(T) \;=\; N_0(T) \;+\; \frac{1}{\pi}\,\operatorname{Im}\!\sum_{p \le p_k}\bigl(1 - e^{-\sqrt{T/p}}\bigr)\,\log\!\bigl(1 - p^{-1/2 + iT}\bigr)
+$$
+
+Smooth damping that pre-suppresses primes with $p \gtrsim T$. No provable
+error bound; empirically $|F_A - N| \sim 10^{-2}$ at $k = 1000$ across the
+scan.
+
+### Rigorous (`--ghy`)
+
+$$
+F_B(T) \;=\; N_0(T) \;+\; \frac{1}{\pi}\,\arg P_X\!\left(\tfrac{1}{2} + iT\right),
+\qquad
+\log P_X(s) \;=\; \sum_{p^m \le X}\frac{1}{m\,p^{ms}},
+\qquad
+X = p_k.
+$$
+
+Partial Euler factor of [Gonek–Hughes–Young 2007, eq. 6](#literature). Under
+RH, the Goldston 1987 bound combined with GHY Theorem 1 gives:
+
+$$
+\bigl|F_B(T) - N(T)\bigr| \;\le\; \frac{1}{\pi}\,\frac{\log T}{\log X} \;+\; O\!\left(\frac{\log X}{\sqrt{X}}\right).
+$$
+
+### Notes
 
 The two methods are empirically equivalent in the production regime
-(`T ≳ 10⁶`, `k ≲ 10⁴`); see `doc/notes/rigor-bound-b.md` for the numerical
-confrontation. **Validity caveat for `--ghy`:** at very low zeros
-(`T ≲ 100`), B is only inside its rigor regime while `k ≲ π(T log T)`;
-raising k beyond that drifts B away from the true zero. The heuristic A
+($T \gtrsim 10^6$, $k \lesssim 10^4$); see
+[`doc/notes/rigor-bound-b.md`](doc/notes/rigor-bound-b.md) for the numerical
+confrontation.
+
+**Validity caveat for `--ghy`:** at very low zeros ($T \lesssim 100$), B
+is only inside its rigor regime while $k \lesssim \pi(T \log T)$; raising
+$k$ beyond that drifts B away from the true zero. The heuristic A
 self-limits via its damping and stays accurate. See
-`doc/notes/low-zero-regime.md`.
+[`doc/notes/low-zero-regime.md`](doc/notes/low-zero-regime.md).
 
 Auxiliary binaries `zhybrid`, `zghy`, `zhad`, `zproxy` evaluate the related
-GHY proxies on grids; `zhybrid` implements the full hybrid `P_X · Z_X` with
-seed zeros (rigorous error `O(log X / √X)`).
+GHY proxies on grids; `zhybrid` implements the full hybrid $P_X \cdot Z_X$
+with seed zeros (rigorous error $O(\log X / \sqrt X)$).
 
 ## Zero counting function approximation
 
@@ -153,3 +173,7 @@ range 0 to 20  (50 zeros)          |    range 541 to 661 (1,000 zeros)     | ran
   * https://empslocal.ex.ac.uk/people/staff/mrwatkin/zeta/berry-keating1.pdf
 * Guilherme França, André LeClair: *Statistical and other properties of Riemann zeros based on an explicit equation for the n-th zero on the critical line*
   * https://arxiv.org/abs/1307.8395
+* Steven M. Gonek, Christopher P. Hughes, Matthew P. Young: *A hybrid Euler–Hadamard product for the Riemann zeta function*, Duke Math. J. **136** (2007), 507–549.
+  * https://arxiv.org/abs/math/0511092
+* Daniel A. Goldston: *On the function S(T) in the theory of the Riemann zeta-function*, J. Number Theory **27** (1987), 149–177.
+  * https://doi.org/10.1016/0022-314X(87)90061-4
