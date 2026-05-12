@@ -26,54 +26,11 @@ fast approximation of large Riemann zeta zeros
   -V, --version              Print program version
 ```
 
-## Counting modes
-
-`zzz` exposes two zeta-evaluation-free counting functions; both bisect for
-the n-th zero with the same driver and CLI.
-
-### Default (heuristic)
-
-$$
-F_A(T) \;=\; N_0(T) \;+\; \frac{1}{\pi}\,\operatorname{Im}\!\sum_{p \le p_k}\bigl(1 - e^{-\sqrt{T/p}}\bigr)\,\log\!\bigl(1 - p^{-1/2 + iT}\bigr)
-$$
-
-Smooth damping that pre-suppresses primes with $p \gtrsim T$. No provable
-error bound; empirically $|F_A - N| \sim 10^{-2}$ at $k = 1000$ across the
-scan.
-
-### Rigorous (`--ghy`)
-
-$$
-F_B(T) \;=\; N_0(T) \;+\; \frac{1}{\pi}\,\arg P_X\!\left(\tfrac{1}{2} + iT\right),
-\qquad
-\log P_X(s) \;=\; \sum_{p^m \le X}\frac{1}{m\,p^{ms}},
-\qquad
-X = p_k.
-$$
-
-Partial Euler factor of [Gonek–Hughes–Young 2007, eq. 6](#literature). Under
-RH, the Goldston 1987 bound combined with GHY Theorem 1 gives:
-
-$$
-\bigl|F_B(T) - N(T)\bigr| \;\le\; \frac{1}{\pi}\,\frac{\log T}{\log X} \;+\; O\!\left(\frac{\log X}{\sqrt{X}}\right).
-$$
-
-### Notes
-
-The two methods are empirically equivalent in the production regime
-($T \gtrsim 10^6$, $k \lesssim 10^4$); see
-[`doc/notes/rigor-bound-b.md`](doc/notes/rigor-bound-b.md) for the numerical
-confrontation.
-
-**Validity caveat for `--ghy`:** at very low zeros ($T \lesssim 100$), B
-is only inside its rigor regime while $k \lesssim \pi(T \log T)$; raising
-$k$ beyond that drifts B away from the true zero. The heuristic A
-self-limits via its damping and stays accurate. See
-[`doc/notes/low-zero-regime.md`](doc/notes/low-zero-regime.md).
-
-Auxiliary binaries `zhybrid`, `zghy`, `zhad`, `zproxy` evaluate the related
-GHY proxies on grids; `zhybrid` implements the full hybrid $P_X \cdot Z_X$
-with seed zeros (rigorous error $O(\log X / \sqrt X)$).
+The `--ghy` flag swaps the heuristic damping for the Gonek–Hughes–Young
+partial Euler factor $P_X$, placing the counter inside a provable error
+chain (RH + GHY Thm 1 + Goldston 1987). Aux binaries `zproxy`, `zghy`,
+`zhad`, `zhybrid` dump the various inner factors on TSV grids. See
+[`doc/ghy.md`](doc/ghy.md) for the design and the rigor reference.
 
 ## Zero counting function approximation
 
@@ -81,17 +38,17 @@ Note: obsolete inner sum approximation, not used any more.
 
 Combines quadratic and cubic spline with correct frequency and tangents to match the amplitude.
 
-![waves](doc/waves.png)
+![waves](doc/heuristic/waves.png)
 
 ## Towards convergence
 
-![waves](doc/convergence.png)
+![waves](doc/heuristic/convergence.png)
 
 ## Error distribution
 
 In comparison with k=-∞ (basic Lambert W approximation).
 
-![errors](doc/errors.png)
+![errors](doc/heuristic/errors.png)
 
 # Approximate n-th zero locations
 
@@ -116,51 +73,33 @@ sys     0m0.007s
 ## Zero # 10^36 + 42420637374017961984
 
 ```bash
-  $ time ./zzz -k 10000 1e36 42420637374017961984
-```
-
-```text
+$ time ./zzz -k 10000 1e36 42420637374017961984
 81029194732694548890047854481676713.009431
 
 real    0m1.473s
 ```
 
-```bash
-  $ time ./zzz --ghy -k 10000 1e36 42420637374017961984
+```
+81029194732694548890047854481676712.94002   prev approximate     #10^36+42420637374017961983
+81029194732694548890047854481676712.98790          published     #10^36+42420637374017961984
+81029194732694548890047854481676713.00943        approximate     #10^36+42420637374017961984
+81029194732694548890047854481676713.08748   next approximate     #10^36+42420637374017961985
 ```
 
-```text
+```bash
+$ time ./zzz --ghy -k 10000 1e36 42420637374017961984
 81029194732694548890047854481676713.009348
 
 real    0m0.631s
 ```
 
-The rigorous `--ghy` mode is ~2× faster: its per-prime kernel is
-$1/(m\,p^{ms})$ (one `pow`, no `log`, no `exp`), whereas A spends a
-`log(1 - p^{-s})` and a damping `exp(-\sqrt{T/p})` per prime.
-
-```
-81029194732694548890047854481676712.93994   prev approximate (B)  #10^36+42420637374017961983
-81029194732694548890047854481676712.94002   prev approximate (A)  #10^36+42420637374017961983
-81029194732694548890047854481676712.98790          published      #10^36+42420637374017961984
-81029194732694548890047854481676713.00935        approximate (B)  #10^36+42420637374017961984
-81029194732694548890047854481676713.00943        approximate (A)  #10^36+42420637374017961984
-81029194732694548890047854481676713.08748   next approximate (A)  #10^36+42420637374017961985
-81029194732694548890047854481676713.08750   next approximate (B)  #10^36+42420637374017961985
-```
-
-A and B agree to seven decimal digits at this height; both land
-~$0.022$ above the published value, comfortably inside the $\pm 0.07$
-neighbour gap and consistent with GHY/Goldston's $\sim 0.04$ provable
-ceiling at $T = 10^{36}$, $X = p_{10000}$.
-
 ## Chebyshev Psi Exact Formula
 
 Using zeros approximated by `zzz -k 1000`.
 
-range 0 to 20  (50 zeros)          |    range 541 to 661 (1,000 zeros)     | range 7920-8020 (10,000 zeros)  
-:---------------------------------:|:-------------------------------------:|:--------------------------------------:
-![](doc/psi-50-zeros-k1000-p1.png) | ![](doc/psi-10k-zeros-k1000-p100.png) | ![](doc/psi-10k-zeros-k1000-p1000.png)
+range 0 to 20  (50 zeros)                    |    range 541 to 661 (1,000 zeros)               | range 7920-8020 (10,000 zeros)
+:-------------------------------------------:|:-----------------------------------------------:|:------------------------------------------------:
+![](doc/heuristic/psi-50-zeros-k1000-p1.png) | ![](doc/heuristic/psi-10k-zeros-k1000-p100.png) | ![](doc/heuristic/psi-10k-zeros-k1000-p1000.png)
 
 
 # Literature
