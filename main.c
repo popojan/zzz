@@ -2,6 +2,7 @@
 #include <flint/acb.h>
 #include "flint/ulong_extras.h"
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "argp.h"
 #include "ghy.h"
@@ -780,13 +781,70 @@ static int bisect_zero(arb_t out_t, const arb_t m_half, const arb_t t0,
     return bracketed ? 0 : 1;
 }
 
+// Load consecutive zero ordinates (one decimal string per line, parsed at
+// full precision) into a freshly allocated arb array. Returns the count,
+// or -1 on error. Non-numeric lines are skipped.
+static slong load_seed_ordinates(const char *path, arb_struct **out, slong PREC) {
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        flint_fprintf(stderr, "cannot open seeds file %s\n", path);
+        return -1;
+    }
+    slong cap = 1024, n = 0;
+    arb_struct *buf = malloc(cap * sizeof(arb_struct));
+    char line[256];
+    while (fgets(line, sizeof line, f) && n < cap) {
+        char *p = line;
+        while (*p == ' ' || *p == '\t') ++p;
+        if (*p < '0' || *p > '9') continue;
+        char *e = p + strlen(p);
+        while (e > p && (e[-1] == '\n' || e[-1] == '\r' || e[-1] == ' ')) --e;
+        *e = 0;
+        arb_init(buf + n);
+        if (arb_set_str(buf + n, p, PREC)) {
+            flint_fprintf(stderr, "seeds file: cannot parse '%s'\n", p);
+            arb_clear(buf + n);
+            for (slong i = 0; i < n; ++i) arb_clear(buf + i);
+            free(buf);
+            fclose(f);
+            return -1;
+        }
+        ++n;
+    }
+    fclose(f);
+    *out = buf;
+    return n;
+}
+
 // Locate zero #m0 via the self-consistent leave-one-out hybrid. W neighbours
-// each side, `rounds` relocation rounds. Returns 0 on success.
+// each side, `rounds` relocation rounds. If seeds_path is non-NULL the P_X
+// seeding pass is skipped and the window ordinates are read from the file
+// instead (odd count, target on the middle line). Returns 0 on success.
 static int boot_locate(arb_t out_t, const arb_t m0, slong W, slong rounds,
-                       ulong X, double w0, double tol, slong PREC, int verbose)
+                       ulong X, double w0, double tol, slong PREC, int verbose,
+                       const char *seeds_path)
 {
-    slong lo_off = -W;
-    {
+    slong lo_off, n, ci;
+    double *dgam;
+    arb_struct *tj = NULL;
+    arb_t t_base, m_half, mj, guess, tmp;
+    int fail = 0;
+
+    if (seeds_path) {
+        n = load_seed_ordinates(seeds_path, &tj, PREC);
+        if (n < 0) return 1;
+        if (n < 3 || n % 2 == 0) {
+            flint_fprintf(stderr,
+                "seeds file must hold an odd number (>= 3) of consecutive zeros, got %wd\n", n);
+            for (slong i = 0; i < n; ++i) arb_clear(tj + i);
+            free(tj);
+            return 1;
+        }
+        ci = n / 2;
+        W = ci;
+        lo_off = -ci;
+    } else {
+        lo_off = -W;
         arb_t lim;
         arb_init(lim);
         for (; lo_off < 0; ++lo_off) {
@@ -794,16 +852,13 @@ static int boot_locate(arb_t out_t, const arb_t m0, slong W, slong rounds,
             if (!arb_lt(m0, lim)) break;    // m0 >= 1 - lo_off: window fits
         }
         arb_clear(lim);
+        n = W - lo_off + 1;
+        ci = -lo_off;
+        tj = malloc(n * sizeof(arb_struct));
+        for (slong i = 0; i < n; ++i) arb_init(tj + i);
     }
-    slong n = W - lo_off + 1;
-    slong ci = -lo_off;
 
-    double *dgam = malloc(n * sizeof(double));
-    arb_struct *tj = malloc(n * sizeof(arb_struct));
-    arb_t t_base, m_half, mj, guess, tmp;
-    int fail = 0;
-
-    for (slong i = 0; i < n; ++i) arb_init(tj + i);
+    dgam = malloc(n * sizeof(double));
     arb_init(t_base);
     arb_init(m_half);
     arb_init(mj);
@@ -816,7 +871,7 @@ static int boot_locate(arb_t out_t, const arb_t m0, slong W, slong rounds,
     cfg.skip = -1;
 
     // pass 1: primes-only F_B for every window ordinal
-    for (slong i = 0; i < n && !fail; ++i) {
+    for (slong i = 0; seeds_path == NULL && i < n && !fail; ++i) {
         arb_add_si(mj, m0, lo_off + i, PREC);
         arb_set_d(tmp, 0.5);
         arb_sub(m_half, mj, tmp, PREC);
@@ -946,6 +1001,7 @@ static struct argp_option options[] = {
         { "ghy",   'G', 0, 0, "use GHY partial Euler P_X (X = p_k) instead of heuristic damping"},
         { "boot",  'B', "W", 0, "self-consistent hybrid bootstrap: seed 2W+1 zeros with P_X, then iterate leave-one-out P_X*Z_X relocation (implies --ghy)"},
         { "rounds",'R', "R", 0, "bootstrap relocation rounds [default 2]"},
+        { "seeds", 'S', "FILE", 0, "bootstrap seeds from FILE: odd number of consecutive zero ordinates, one decimal per line, target in the middle; skips the P_X seeding pass (use -R 0 to relocate the target only)"},
         { 0 }
 };
 
@@ -962,6 +1018,7 @@ struct arguments {
     slong ghy;
     slong boot;
     slong rounds;
+    const char *seeds;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -980,6 +1037,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 'G': arguments->ghy = 1; break;
         case 'B': arguments->boot = atol(arg); break;
         case 'R': arguments->rounds = atol(arg); break;
+        case 'S': arguments->seeds = arg; break;
         case ARGP_KEY_ARG: return 0;
         default: return ARGP_ERR_UNKNOWN;
     }
@@ -1027,13 +1085,14 @@ int main(int argc, char *argv[])
     arguments.ghy = 0;
     arguments.boot = 0;
     arguments.rounds = 2;
+    arguments.seeds = NULL;
 
     int arg_index = 1;
     argp_parse(&argp, argc, argv, ARGP_NO_ARGS, &arg_index, &arguments);
 
     // GHY mode: resolve X = p_k so the cost matches the heuristic's "k primes"
     ulong ghy_X = 0;
-    if ((arguments.ghy || arguments.boot > 0) && arguments.k > 0) {
+    if ((arguments.ghy || arguments.boot > 0 || arguments.seeds) && arguments.k > 0) {
         ghy_X = n_nth_prime(arguments.k);
     }
 
@@ -1117,12 +1176,12 @@ int main(int argc, char *argv[])
                 flint_fprintf(stderr, "\n");
             }
 
-            if (arguments.boot > 0) {
+            if (arguments.boot > 0 || arguments.seeds) {
                 arb_t bt;
                 arb_init(bt);
                 if (boot_locate(bt, m0, arguments.boot, arguments.rounds, ghy_X,
                                 arguments.w0, arguments.step0, arguments.PREC,
-                                arguments.verbose)) {
+                                arguments.verbose, arguments.seeds)) {
                     flint_fprintf(stderr, "bootstrap failed to bracket; increase the window\n");
                 } else {
                     if (arguments.eval > 0) {
