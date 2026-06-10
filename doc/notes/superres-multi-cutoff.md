@@ -316,3 +316,53 @@ $G_{jj} = a^3/3\pi$ — closed form, probed on true $10^{22}$ zeros at
   solve; success = beating the true-seed ceiling (3.5×) toward the
   0.01-gap information bound (~20×) against Odlyzko truth. If realized,
   the same engineering at k ~ 10⁶ attacks $10^{36}$ itself.
+
+**E4 step 3 — the fit, and the final answer: B saturates the band.**
+`e4-fit.wls`. Functionals: windowed modulations
+$W(x)\cos/\sin(\omega x)$, $W = \mathrm{sinc}(3x/16)^{16}$ (band 3),
+$\omega \le a-3$, single centre; Weil pairs are closed-form B-splines, the
+archimedean term collapses at height $10^{21}$ to $2\log(T_c/2\pi)\hat
+g_W(\omega)$ (corrections $O(1/T_c)$); phases $\cos(T_c u)$ folded at 130
+digits, all else machine. Family algebra validated as an identity at
+$T=143.5$ to $10^{-8}$ (light-quadrature floor). Fit: 178 unknowns
+(window ±12), far zone ±20 fixed at B seeds, 114 functionals, Tikhonov
+prior at B ($\sigma_p = 0.012$), Gauss–Newton with 50-digit normal
+equations — converges to the data floor (|r| $14 \to 3.3\times10^{-6}$,
+steps $10^{-11}$).
+
+Result at $10^{22}{+}5000$, k=10⁴ (60 central zeros): **gain 0.994×**,
+fit errors ≡ B errors (corr 0.9993). The decisive control:
+
+| configuration | $\|r\|$ against exact Weil data |
+|---|---|
+| B positions (raw) | 0.53 |
+| fitted positions (errors ≈ B's, 0.0166) | $3.3\times10^{-6}$ (floor) |
+| **true positions** | $5.0\times10^{-6}$ (floor) |
+
+Truth and the B-displaced configuration are *equally consistent* with
+every band-limited functional of the primes — a constructive
+demonstration that two configurations 0.017 apart produce identical
+band-$a$ data to the working floor. **Below $\mathrm{gap}\cdot\log X =
+\pi$, method B already saturates the information content of primes
+$\le X$ about individual zeros.** The bootstrap (crossings), E2/E3
+(kernel ML), and E4 (exact-identity ML) all reproduce B for this one
+reason; E1's oracle gains measure what *external* knowledge would buy,
+not what the primes contain.
+
+Consequently the step-2 projection "$10^{36}$ feasible at 240k–14M
+primes" is **retracted** — it was conditional on the far zone being
+known (oracle); self-contained, the evanescent channels cannot be used.
+The validity boundary for beating B from primes alone is
+$\mathrm{gap}\cdot\log X \gtrsim \pi$, i.e. $X \gtrsim \sqrt{T/2\pi}$ —
+the Riemann–Siegel wall is information-theoretic, not algorithmic.
+
+What remains open, stated precisely: distinguishability *below* today's
+floor ($5\times10^{-6}$, set by far-zone-at-B and machine arithmetic).
+Quantization/positivity of the zero measure could in principle break the
+degeneracy at some far smaller scale (the manifold of data-consistent
+configurations is finite-dimensional and the true zeros are rigid
+points, not a continuum); five independent negatives put a heavy prior
+against it being reachable, but today's experiments bound it only down
+to the floor. A positive use of the machinery is also untested: *above*
+the threshold the exact-identity fit should beat the bootstrap's
+constants (it wastes no information on crossing-reading).
