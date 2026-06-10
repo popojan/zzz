@@ -279,6 +279,40 @@ side cuts off at $p^m \le X$ *exactly*. Against Odlyzko's 1000-digit zeros
 (first 100, `zeros2`, X = 10⁵, T ∈ {γ₅₀, 143.5, 100}):
 $q{=}4$ closes to $10^{-16.4..-17.7}$ (the predicted sinc⁸ zero-tail floor,
 correct sign), $q{=}10$ closes to $10^{-34}$ at all three centers. Every
-constant in the formula is pinned. Next: step 2, the singular-spectrum
-probe of the linearized recovery problem at the proxy regime — the go/no-go
-measurement for sub-Rayleigh extraction.
+constant in the formula is pinned.
+
+**E4 step 2 — singular-spectrum probe: GO, with a refined threshold.**
+`e4-spectrum-probe.wls`. The space of available functionals is at best the
+Paley–Wiener space $PW_a$ with kernel $K(x,y) = \sin(a(x-y))/\pi(x-y)$; the
+linearized design for window-zero perturbations has Gram
+$G_{jk} = -s''(\gamma_j - \gamma_k)$, $s(z) = \sin(az)/\pi z$,
+$G_{jj} = a^3/3\pi$ — closed form, probed on true $10^{22}$ zeros at
+200-digit precision. Findings:
+
+| config | gap·$a$ | need (0.01 gap) | prolate leakage $e^{-2a\cdot w}$ | verdict |
+|---|---|---|---|---|
+| k=600, ±3 (M=45) | 1.12 | 4e−25 | ~1e−22 | marginal fail |
+| k=600, ±6 (M=89) | 1.12 | 3e−48 | ~2e−44 | fail (widening loses) |
+| k=10⁴, ±6 | 1.55 | 7e−35 | ~6e−61 | **GO, 26 orders of margin** |
+| 10³⁶ regime, k=10⁴ | 0.92 | 5e−56 | ~2e−34 | fail by 22 orders |
+
+- The eigen-plunge is ~2× steeper than the Landau–Widom estimate
+  (~1.7 $\log_{10}\lambda$ per rank past Shannon) but finite — full-window
+  recovery needs 25–56 digits of functional data, trivial for arb. The
+  binding constraint is the **race** between needed accuracy
+  ($\sim$ 8–21 digits per unit window half-width, from the measured plunge ×
+  zero density) and admissible-functional leakage suppression
+  ($2a/\ln 10$ digits per unit). Equal slopes give the refined validity
+  boundary $\mathrm{gap}\cdot\log X \gtrsim 1.2$ (bracketed by the
+  measured 1.12-fail / 1.55-pass configs) — versus $\pi$ for every
+  crossing/ML method measured before (E2/E3, bootstrap).
+- Consequence for the endgame: at $10^{36}$ the old threshold demanded
+  $X \sim 10^{17}$; the refined one needs $\mathrm{gap}\cdot\log X \approx
+  1.2\text{–}1.5$, i.e. $X \approx 3\times10^6$–$10^8$ — **240k–14M primes,
+  computationally feasible**.
+- Step 3 target, fully quantified: implement the fit at the GO config
+  ($10^{22}$, k=10⁴): near-prolate windows (the 26-order margin tolerates
+  far-from-optimal windows), Weil-evaluator data at ~60 digits, Newton
+  solve; success = beating the true-seed ceiling (3.5×) toward the
+  0.01-gap information bound (~20×) against Odlyzko truth. If realized,
+  the same engineering at k ~ 10⁶ attacks $10^{36}$ itself.
