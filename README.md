@@ -62,6 +62,15 @@ feasible prime count. Derivation, stability analysis (guard ring, basin-hop
 rejection, the purely-imaginary-$E_1$ pitfall) and the validity threshold:
 [`doc/notes/bootstrap-hybrid.md`](doc/notes/bootstrap-hybrid.md).
 
+Below that threshold nothing can beat plain `--ghy` from the same primes:
+crossing relocation, kernel ML, multi-cutoff ML and exact Weil-identity
+fitting all reproduce its errors, and a truth control shows the true zeros
+and the `--ghy`-displaced ones are indistinguishable to every band-limited
+functional of $p^m \le X$. The measured saturation principle, its
+consequences (the wall scales as $\sqrt{T/2\pi}$ — feasibility, not
+impossibility) and why the lowest-$k$ primes are the optimal selection:
+[`doc/notes/band-saturation.md`](doc/notes/band-saturation.md).
+
 ```bash
 $ time ./zzz --boot 32 -k 1000 -d 8 1e12 +1  # zero #10^12+1, true 267653395648.8475231
 267653395648.84975665                        # |err| 0.0022 (--ghy alone: 0.0041)

@@ -169,6 +169,11 @@ Showcase zero #$10^{36} + 42420637374017961984$
   field smeared at different kernel widths — used as a deconvolution problem
   with B seeds as priors. The cutoff-sweep experiment showed free-frequency
   fitting is ill-conditioned, but seeded/regularised multi-L inversion is open.
+  *[Resolved, negative: pursued the same day as experiments E1–E4 (Si-kernel
+  ML, multi-cutoff ML, exact Weil-identity ML with a truth control). Below
+  gap·log X = π, method B saturates the information in the primes — see
+  `band-saturation.md` for the synthesis, `superres-multi-cutoff.md` for the
+  lab log.]*
 - Cost: pass 1 dominates (every neighbour bisected from the asymptotic guess
   with the full default window). Marching seeds (neighbour $j+1$ from located
   $j$ + mean gap) would cut pass-1 cost several-fold. Not yet implemented.

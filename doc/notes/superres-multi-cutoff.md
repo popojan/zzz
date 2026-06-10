@@ -4,8 +4,14 @@
 [`bootstrap-hybrid.md`](bootstrap-hybrid.md), which established the validity
 threshold $X \gtrsim \sqrt{T/2\pi}$ for crossing-based methods. This note
 specifies the experiments that attack the regime **below** that threshold,
-with every formula the code implements. Status: planned; results to be
-appended.*
+with every formula the code implements.*
+
+***Status: lab log, complete.* Sections 1–6 are the original plan and are
+kept as written; several of their expectations (and step 2's "GO" verdict
+in §7) were refuted or retracted by later results, in place. The final
+verdict — method B saturates the band below $\mathrm{gap}\cdot\log X = \pi$
+— and the clean synthesis of the whole program live in
+[`band-saturation.md`](band-saturation.md).**
 
 ## 1. The problem, restated as information theory
 
@@ -33,6 +39,11 @@ separation in Rayleigh cells, $m$ = sources per cell), payable in precision
 bits. Crossing-based estimators (method B, `--boot`) are linear,
 single-functional readers of the field and *are* Rayleigh-limited — that is
 what dies at $X \approx \sqrt{T/2\pi}$, not the information.
+
+*[Post-hoc: this paragraph survived only in oracle form. The exact-data
+super-resolution argument presumes the far zone known; self-contained, the
+information below the threshold is genuinely inaccessible — see E4 step 3
+in §7 and `band-saturation.md`.]*
 
 ## 2. Notation and data field
 
@@ -178,7 +189,9 @@ $\{150, 200, 270, 360, 450, 600\}$ ($L' \approx 6.8$–8.4), Hann taper.
 
 **E4 — scale up** only if E2/E3 succeed: $10^{21}/10^{22}$ at $k = 10^4$,
 then the $10^{36}$ showcase zero (validation = the single published
-Bober–Hiary value).
+Bober–Hiary value). *[Naming note: E2/E3 did not succeed and this scale-up
+never ran; the label "E4" was reused for the Weil-formula program
+(steps 1–3 in §7), an unrelated escalation.]*
 
 Grid defaults (E2/E3): $T$-grid $T_0 \pm 4\,\mathrm{gap}\cdot W_{\rm eff}$
 … in practice $T_0 \pm 2.5$ with 150–250 points, $\sigma_T \approx 0.8$;
@@ -282,6 +295,9 @@ correct sign), $q{=}10$ closes to $10^{-34}$ at all three centers. Every
 constant in the formula is pinned.
 
 **E4 step 2 — singular-spectrum probe: GO, with a refined threshold.**
+*[Retracted in step 3: the "GO", the refined threshold ~1.2, and the
+"240k–14M primes for $10^{36}$" projection all assumed the far zone known
+(oracle). Kept as written for the record.]*
 `e4-spectrum-probe.wls`. The space of available functionals is at best the
 Paley–Wiener space $PW_a$ with kernel $K(x,y) = \sin(a(x-y))/\pi(x-y)$; the
 linearized design for window-zero perturbations has Gram
