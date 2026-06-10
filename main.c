@@ -2,6 +2,7 @@
 #include <flint/acb.h>
 #include "flint/ulong_extras.h"
 #include <stdlib.h>
+#include <math.h>
 #include "argp.h"
 #include "ghy.h"
 
@@ -662,6 +663,272 @@ void zero_count_approx(arb_ptr out, arb_srcptr t, slong k, slong PREC) {
     arb_clear(x);
 }
 
+// --- GHY hybrid bootstrap (method C with self-computed seed zeros) ----------
+//
+// Pass 1 locates 2W+1 consecutive zeros around the target with the primes-only
+// counter F_B = N_0 + arg P_X / pi. These approximate ordinates then seed the
+// GHY local Hadamard factor Z_X, and every zero is re-located with the
+// leave-one-out hybrid count
+//   F_C^(j)(T) = N_0(T) + (arg P_X + arg Z_X^{excl j})(1/2 + iT) / pi
+// Gauss-Seidel style for a configurable number of rounds. Z_X subtracts the
+// neighbours' truncation oscillation ~cos((T-gamma_j) log X)/((T-gamma_j) log X)
+// -- the dominant F_B location error -- while the excluded target's own smeared
+// step stays centred at its true ordinate. Zeta-evaluation-free throughout;
+// the seeds come from the method itself, not from precomputed zero tables.
+
+typedef struct {
+    int method;               // 1 = B (P_X only), 2 = C leave-one-out hybrid
+    slong k;                  // prime count (method A)
+    ulong X;                  // prime-power cutoff for P_X / Z_X
+    const arb_struct *t_base; // C: window base ordinate
+    const double *dgam;       // C: zero offsets from t_base
+    slong n_gam;
+    slong skip;               // C: index left out of Z_X, -1 for none
+} zc_cfg;
+
+static void zero_count_eval(arb_ptr out, arb_srcptr t, const zc_cfg *cfg, slong PREC) {
+    if (cfg->method == 0) {
+        zero_count_exact(out, t, cfg->k, PREC);
+        return;
+    }
+    zero_count_ghy(out, t, cfg->X, PREC);
+    if (cfg->method == 2) {
+        acb_t s, logz;
+        arb_t pi;
+
+        acb_init(s);
+        acb_init(logz);
+        arb_init(pi);
+
+        arb_one(acb_realref(s));
+        arb_div_ui(acb_realref(s), acb_realref(s), 2, PREC);
+        arb_set(acb_imagref(s), t);
+
+        ghy_log_zx_rel(logz, s, cfg->t_base, cfg->dgam, cfg->n_gam,
+                       cfg->skip, cfg->X, 0.0, PREC);
+
+        arb_const_pi(pi, PREC);
+        arb_div(acb_imagref(logz), acb_imagref(logz), pi, PREC);
+        arb_add(out, out, acb_imagref(logz), PREC);
+
+        acb_clear(s);
+        acb_clear(logz);
+        arb_clear(pi);
+    }
+}
+
+// Bisect F(T) = m_half starting from guess t0 with half-width w0, doubling the
+// bracket up to widen_max times if the initial window misses. Returns 0 on
+// success. Pass widen_max = 1 when a far-away crossing would be worse than no
+// answer (bootstrap relocations must not hop into a neighbour's basin).
+static int bisect_zero(arb_t out_t, const arb_t m_half, const arb_t t0,
+                       double w0, double tol, int widen_max,
+                       const zc_cfg *cfg, slong PREC)
+{
+    arb_t lo_t, hi_t, mid_t, lo, hi, mid, step, width, tolb;
+    int bracketed = 0;
+
+    arb_init(lo_t);
+    arb_init(hi_t);
+    arb_init(mid_t);
+    arb_init(lo);
+    arb_init(hi);
+    arb_init(mid);
+    arb_init(step);
+    arb_init(width);
+    arb_init(tolb);
+
+    arb_set_d(step, w0);
+    arb_set_d(tolb, tol);
+
+    for (int widen = 0; widen < widen_max && !bracketed; ++widen) {
+        arb_sub(lo_t, t0, step, PREC);
+        arb_add(hi_t, t0, step, PREC);
+        zero_count_eval(lo, lo_t, cfg, PREC);
+        zero_count_eval(hi, hi_t, cfg, PREC);
+        if (!(arb_gt(lo, m_half) || arb_lt(hi, m_half) || arb_lt(hi, lo)))
+            bracketed = 1;
+        else
+            arb_mul_ui(step, step, 2, PREC);
+    }
+
+    if (bracketed) {
+        while (1) {
+            arb_add(mid_t, lo_t, hi_t, PREC);
+            arb_mul_2exp_si(mid_t, mid_t, -1);
+            zero_count_eval(mid, mid_t, cfg, PREC);
+            if (arb_gt(mid, m_half))
+                arb_set(hi_t, mid_t);
+            else
+                arb_set(lo_t, mid_t);
+            arb_sub(width, hi_t, lo_t, PREC);
+            if (arb_lt(width, tolb)) break;
+        }
+        arb_set(out_t, mid_t);
+    }
+
+    arb_clear(lo_t);
+    arb_clear(hi_t);
+    arb_clear(mid_t);
+    arb_clear(lo);
+    arb_clear(hi);
+    arb_clear(mid);
+    arb_clear(step);
+    arb_clear(width);
+    arb_clear(tolb);
+
+    return bracketed ? 0 : 1;
+}
+
+// Locate zero #m0 via the self-consistent leave-one-out hybrid. W neighbours
+// each side, `rounds` relocation rounds. Returns 0 on success.
+static int boot_locate(arb_t out_t, const arb_t m0, slong W, slong rounds,
+                       ulong X, double w0, double tol, slong PREC, int verbose)
+{
+    slong lo_off = -W;
+    {
+        arb_t lim;
+        arb_init(lim);
+        for (; lo_off < 0; ++lo_off) {
+            arb_set_si(lim, 1 - lo_off);
+            if (!arb_lt(m0, lim)) break;    // m0 >= 1 - lo_off: window fits
+        }
+        arb_clear(lim);
+    }
+    slong n = W - lo_off + 1;
+    slong ci = -lo_off;
+
+    double *dgam = malloc(n * sizeof(double));
+    arb_struct *tj = malloc(n * sizeof(arb_struct));
+    arb_t t_base, m_half, mj, guess, tmp;
+    int fail = 0;
+
+    for (slong i = 0; i < n; ++i) arb_init(tj + i);
+    arb_init(t_base);
+    arb_init(m_half);
+    arb_init(mj);
+    arb_init(guess);
+    arb_init(tmp);
+
+    zc_cfg cfg = { 0 };
+    cfg.method = 1;
+    cfg.X = X;
+    cfg.skip = -1;
+
+    // pass 1: primes-only F_B for every window ordinal
+    for (slong i = 0; i < n && !fail; ++i) {
+        arb_add_si(mj, m0, lo_off + i, PREC);
+        arb_set_d(tmp, 0.5);
+        arb_sub(m_half, mj, tmp, PREC);
+        nt_inv(guess, mj, PREC);
+        fail = bisect_zero(tj + i, m_half, guess, w0, tol, 6, &cfg, PREC);
+    }
+
+    if (!fail) {
+        arb_set(t_base, tj + ci);
+        for (slong i = 0; i < n; ++i) {
+            arb_sub(tmp, tj + i, t_base, PREC);
+            dgam[i] = arf_get_d(arb_midref(tmp), ARF_RND_NEAR);
+        }
+        if (verbose) {
+            flint_fprintf(stderr, "boot pass 1: %wd zeros seeded around target\n", n);
+            if (verbose > 1) {
+                flint_fprintf(stderr, "seed offsets:");
+                for (slong i = 0; i < n; ++i)
+                    flint_fprintf(stderr, " %.4f", dgam[i]);
+                flint_fprintf(stderr, "\n");
+            }
+        }
+
+        // bracket the relocations by the local mean gap 2 pi / log(t / 2 pi)
+        double t_d = arf_get_d(arb_midref(t_base), ARF_RND_NEAR);
+        double wloc = 0.75 * 2.0 * M_PI / log(t_d / (2.0 * M_PI));
+        if (wloc < 16.0 * tol) wloc = 16.0 * tol;
+
+        cfg.method = 2;
+        cfg.t_base = t_base;
+        cfg.dgam = dgam;
+        cfg.n_gam = n;
+
+        // Only the inner core gets relocated; the outer guard ring keeps its
+        // P_X seeds. Relocating window-edge zeros is biased (one-sided
+        // neighbour coverage) and the bias would propagate inward with the
+        // rounds. Guards still serve as Z_X subtraction terms, where their
+        // seed error is second order. Jacobi (snapshot) updates keep the
+        // rounds free of sweep-direction artifacts.
+        slong Wc = (W + 1) / 2;
+        double *dnew = malloc(n * sizeof(double));
+
+        for (slong r = 0; r < rounds && !fail; ++r) {
+            double max_shift = 0.0;
+            slong rejected = 0;
+            for (slong i = 0; i < n; ++i) {
+                dnew[i] = dgam[i];
+                if (i - ci > Wc || ci - i > Wc) continue;
+                cfg.skip = i;
+                arb_add_si(mj, m0, lo_off + i, PREC);
+                arb_set_d(tmp, 0.5);
+                arb_sub(m_half, mj, tmp, PREC);
+                arb_set_d(tmp, dgam[i]);
+                arb_add(guess, t_base, tmp, PREC);
+                // no widening, and reject basin hops: a relocation that does
+                // not converge near the seed keeps the seed (B quality)
+                if (bisect_zero(tj + i, m_half, guess, wloc, tol, 1, &cfg, PREC)) {
+                    ++rejected;
+                    continue;
+                }
+                arb_sub(tmp, tj + i, t_base, PREC);
+                double nd = arf_get_d(arb_midref(tmp), ARF_RND_NEAR);
+                if (fabs(nd - dgam[i]) > 0.45 * wloc) {
+                    ++rejected;
+                    continue;
+                }
+                dnew[i] = nd;
+                if (fabs(nd - dgam[i]) > max_shift)
+                    max_shift = fabs(nd - dgam[i]);
+            }
+            for (slong i = 0; i < n; ++i) dgam[i] = dnew[i];
+            if (verbose) {
+                flint_fprintf(stderr, "boot round %wd: max shift %.3e, %wd rejected\n",
+                              r + 1, max_shift, rejected);
+                if (verbose > 1) {
+                    flint_fprintf(stderr, "offsets:");
+                    for (slong i = 0; i < n; ++i)
+                        flint_fprintf(stderr, " %.4f", dgam[i]);
+                    flint_fprintf(stderr, "\n");
+                }
+            }
+        }
+
+        free(dnew);
+
+        // final centre relocation with the converged neighbour set; fall back
+        // to the last accepted estimate if the bracket misses
+        if (!fail) {
+            cfg.skip = ci;
+            arb_set_d(tmp, 0.5);
+            arb_sub(m_half, m0, tmp, PREC);
+            arb_set_d(tmp, dgam[ci]);
+            arb_add(guess, t_base, tmp, PREC);
+            if (bisect_zero(out_t, m_half, guess, wloc, tol, 1, &cfg, PREC)) {
+                arb_set_d(tmp, dgam[ci]);
+                arb_add(out_t, t_base, tmp, PREC);
+            }
+        }
+    }
+
+    for (slong i = 0; i < n; ++i) arb_clear(tj + i);
+    free(tj);
+    free(dgam);
+    arb_clear(t_base);
+    arb_clear(m_half);
+    arb_clear(mj);
+    arb_clear(guess);
+    arb_clear(tmp);
+
+    return fail;
+}
+
 const char *argp_program_version = "zzz 0";
 const char *argp_program_bug_address = "<>";
 static char doc[] = "fast approximation of large Riemann zeta zeros";
@@ -677,6 +944,8 @@ static struct argp_option options[] = {
         { "verbose", 'v', 0, 0, "verbose progress output"},
         { "debug", 'g', 0, 0, "debug counting function from <N> to <N+offset> in <count> steps"},
         { "ghy",   'G', 0, 0, "use GHY partial Euler P_X (X = p_k) instead of heuristic damping"},
+        { "boot",  'B', "W", 0, "self-consistent hybrid bootstrap: seed 2W+1 zeros with P_X, then iterate leave-one-out P_X*Z_X relocation (implies --ghy)"},
+        { "rounds",'R', "R", 0, "bootstrap relocation rounds [default 2]"},
         { 0 }
 };
 
@@ -691,6 +960,8 @@ struct arguments {
     slong verbose;
     slong debug;
     slong ghy;
+    slong boot;
+    slong rounds;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -704,9 +975,11 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 'p': arguments->PREC = atol(arg); break;
         case 'z': arguments->ZETA_PREC = atol(arg); break;
         case 'd': arguments->DIGITS = atol(arg); break;
-        case 'v': arguments->verbose = 1; break;
+        case 'v': arguments->verbose += 1; break;
         case 'g': arguments->debug = 1; break;
         case 'G': arguments->ghy = 1; break;
+        case 'B': arguments->boot = atol(arg); break;
+        case 'R': arguments->rounds = atol(arg); break;
         case ARGP_KEY_ARG: return 0;
         default: return ARGP_ERR_UNKNOWN;
     }
@@ -752,13 +1025,15 @@ int main(int argc, char *argv[])
     arguments.verbose = 0;
     arguments.debug = 0;
     arguments.ghy = 0;
+    arguments.boot = 0;
+    arguments.rounds = 2;
 
     int arg_index = 1;
     argp_parse(&argp, argc, argv, ARGP_NO_ARGS, &arg_index, &arguments);
 
     // GHY mode: resolve X = p_k so the cost matches the heuristic's "k primes"
     ulong ghy_X = 0;
-    if (arguments.ghy && arguments.k > 0) {
+    if ((arguments.ghy || arguments.boot > 0) && arguments.k > 0) {
         ghy_X = n_nth_prime(arguments.k);
     }
 
@@ -840,6 +1115,33 @@ int main(int argc, char *argv[])
                 flint_fprintf(stderr, "asymptotic zero location = ");
                 arb_fprintd(stderr, tt, digits);
                 flint_fprintf(stderr, "\n");
+            }
+
+            if (arguments.boot > 0) {
+                arb_t bt;
+                arb_init(bt);
+                if (boot_locate(bt, m0, arguments.boot, arguments.rounds, ghy_X,
+                                arguments.w0, arguments.step0, arguments.PREC,
+                                arguments.verbose)) {
+                    flint_fprintf(stderr, "bootstrap failed to bracket; increase the window\n");
+                } else {
+                    if (arguments.eval > 0) {
+                        acb_t zb;
+                        acb_init(zb);
+                        flint_fprintf(stderr, "value    z = \t");
+                        zeta(zb, bt, arguments.ZETA_PREC);
+                        acb_fprintd(stderr, zb, digits);
+                        flint_fprintf(stderr, "\n");
+                        acb_clear(zb);
+                    }
+                    arf_fprintd(stdout, &bt->mid, digits);
+                    flint_fprintf(stdout, "\n");
+                    fflush(stdout);
+                }
+                arb_clear(bt);
+                arb_one(m);
+                arb_add(m0, m0, m, arguments.PREC);
+                continue;
             }
 
             arb_set_d(m, -0.5);

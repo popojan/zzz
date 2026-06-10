@@ -31,6 +31,21 @@ void ghy_log_zx(acb_ptr out,
                 double window_units,
                 slong PREC);
 
+// log Z_X, window-relative variant for extreme heights: zero j sits at
+// rho_j = 1/2 + i (t_base + dgammas[j]). Offsets fit comfortably in doubles
+// even when the absolute ordinate (e.g. ~10^36) does not. skip_j >= 0
+// excludes that index from the sum (leave-one-out, used by the bootstrap);
+// pass skip_j = -1 to sum over all. window_units as in ghy_log_zx.
+void ghy_log_zx_rel(acb_ptr out,
+                    const acb_t s,
+                    const arb_t t_base,
+                    const double *dgammas,
+                    slong n_gammas,
+                    slong skip_j,
+                    ulong X,
+                    double window_units,
+                    slong PREC);
+
 // N_0(T) = (T/2pi) log(T/2pi e) + 7/8   (smooth Riemann-von Mangoldt part)
 void ghy_n0_smooth(arb_ptr out, arb_srcptr t, slong PREC);
 

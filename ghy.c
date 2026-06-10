@@ -2,6 +2,7 @@
 
 #include "ghy.h"
 #include <flint/acb_hypgeom.h>
+#include <flint/arb_hypgeom.h>
 #include <math.h>
 
 void ghy_log_px(acb_ptr out, const acb_t s, ulong X, slong PREC) {
@@ -46,8 +47,41 @@ void ghy_log_px(acb_ptr out, const acb_t s, ulong X, slong PREC) {
     acb_clear(neg_s);
 }
 
-// E_1(z) via acb_hypgeom_expint with nu = 1
+// E_1(z) via acb_hypgeom_expint with nu = 1.
+//
+// Purely imaginary z = iy goes through real Si/Ci instead:
+//   E_1(iy) = -Ci(|y|) + i (Si(|y|) - pi/2),  conjugated for y < 0.
+// The complex E_1 power series cancels ~|y|/log 2 bits in the mid-range
+// before the asymptotic regime takes over, so the generic path silently
+// returns wide balls there (and on the critical line every Z_X kernel
+// argument is purely imaginary, with |y| up to window-span * log X).
 static void e1(acb_ptr out, const acb_t z, slong PREC) {
+    if (arb_is_zero(acb_realref(z))) {
+        arb_t y, si, ci, half_pi;
+        int neg = arb_is_negative(acb_imagref(z));
+
+        arb_init(y);
+        arb_init(si);
+        arb_init(ci);
+        arb_init(half_pi);
+
+        arb_abs(y, acb_imagref(z));
+        arb_hypgeom_si(si, y, PREC);
+        arb_hypgeom_ci(ci, y, PREC);
+        arb_const_pi(half_pi, PREC);
+        arb_mul_2exp_si(half_pi, half_pi, -1);
+        arb_sub(si, si, half_pi, PREC);
+        if (neg) arb_neg(si, si);
+
+        arb_neg(acb_realref(out), ci);
+        arb_set(acb_imagref(out), si);
+
+        arb_clear(y);
+        arb_clear(si);
+        arb_clear(ci);
+        arb_clear(half_pi);
+        return;
+    }
     acb_t nu;
     acb_init(nu);
     acb_one(nu);
@@ -123,6 +157,74 @@ void ghy_log_zx(acb_ptr out,
     arb_clear(log_X);
     arb_clear(t_arb);
     arb_clear(gamma_arb);
+}
+
+void ghy_log_zx_rel(acb_ptr out,
+                    const acb_t s,
+                    const arb_t t_base,
+                    const double *dgammas,
+                    slong n_gammas,
+                    slong skip_j,
+                    ulong X,
+                    double window_units,
+                    slong PREC)
+{
+    acb_t total, diff, arg_z, kernel, log_X_c;
+    arb_t log_X, t_rel, half, dg;
+    double log_X_d = log((double)X);
+    double t_rel_d;
+
+    acb_init(total);
+    acb_init(diff);
+    acb_init(arg_z);
+    acb_init(kernel);
+    acb_init(log_X_c);
+    arb_init(log_X);
+    arb_init(t_rel);
+    arb_init(half);
+    arb_init(dg);
+
+    acb_zero(total);
+
+    arb_set_ui(log_X, X);
+    arb_log(log_X, log_X, PREC);
+    acb_set_arb(log_X_c, log_X);
+
+    // t_rel = Im(s) - t_base: small in the bootstrap window, exact in arb
+    arb_sub(t_rel, acb_imagref(s), t_base, PREC);
+    t_rel_d = arf_get_d(arb_midref(t_rel), ARF_RND_NEAR);
+
+    // Re(s - rho) = Re(s) - 1/2, shared by all terms
+    arb_set_d(half, 0.5);
+    arb_sub(acb_realref(diff), acb_realref(s), half, PREC);
+
+    for (slong j = 0; j < n_gammas; ++j) {
+        if (j == skip_j) continue;
+        if (window_units > 0.0 &&
+            fabs(t_rel_d - dgammas[j]) * log_X_d > window_units) {
+            continue;
+        }
+
+        // Im(s - rho_j) = t_rel - dgamma_j
+        arb_set_d(dg, dgammas[j]);
+        arb_sub(acb_imagref(diff), t_rel, dg, PREC);
+
+        acb_mul(arg_z, diff, log_X_c, PREC);
+        e1(kernel, arg_z, PREC);
+        acb_add(total, total, kernel, PREC);
+    }
+
+    acb_neg(out, total);
+
+    acb_clear(total);
+    acb_clear(diff);
+    acb_clear(arg_z);
+    acb_clear(kernel);
+    acb_clear(log_X_c);
+    arb_clear(log_X);
+    arb_clear(t_rel);
+    arb_clear(half);
+    arb_clear(dg);
 }
 
 void ghy_n0_smooth(arb_ptr out, arb_srcptr t, slong PREC) {
