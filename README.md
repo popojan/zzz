@@ -5,6 +5,9 @@ fast approximation of large Riemann zeta zeros on the critical line
 Usage: zzz [OPTION...] N [offset] [count]
 fast approximation of large Riemann zeta zeros
 
+  -B, --boot=W               self-consistent hybrid bootstrap: seed 2W+1 zeros
+                             with P_X, then iterate leave-one-out P_X*Z_X
+                             relocation (implies --ghy)
   -d, --digits=DIGITS        extra digits for number formatting [default 6]
   -e, --evaluate             evaluate Riemann zeta function value at the
                              approximate zero location
@@ -16,6 +19,7 @@ fast approximation of large Riemann zeta zeros
                              approximation [default 100]
   -p, --precision=PREC       arb precision for counting function approximation
                              [default 256]
+  -R, --rounds=R             bootstrap relocation rounds [default 2]
   -t, --tolerance=TOL        tolerance for bisection [default 1e-6]
   -v, --verbose              verbose progress output
   -w, --window=WIN           initial span around Lambert W asymptotic zero
@@ -31,6 +35,39 @@ partial Euler factor $P_X$, placing the counter inside a provable error
 chain (RH + GHY Thm 1 + Goldston 1987). Aux binaries `zproxy`, `zghy`,
 `zhad`, `zhybrid` dump the various inner factors on TSV grids. See
 [`doc/ghy.md`](doc/ghy.md) for the design and the rigor reference.
+
+## Self-consistent hybrid bootstrap (`--boot W`)
+
+`--boot W` makes the GHY hybrid $P_X \cdot Z_X$ **self-hosting**: it seeds
+$2W+1$ neighbouring zeros with the primes-only counter, then re-locates the
+inner core with a leave-one-out hybrid count (each zero excluded from its own
+$Z_X$), iterating to a fixed point. No zero tables are consumed; the chain
+stays zeta-evaluation-free.
+
+Validated against Odlyzko's tables (`doc/ghy/boot-validate.sh`, 20 zeros per
+height, `--boot 32`, mean |error| vs plain `--ghy` at the same k):
+
+| height | k | `--ghy` | `--boot 32` | gain |
+|---|---|---|---|---|
+| n ≈ 10³ | 1000 | 0.0153 | **0.0008** | **19×** |
+| n ≈ 10⁵ | 1000 | 0.0179 | 0.0064 | 2.8× |
+| 10¹² | 10⁴ | 0.0089 | 0.0044 | 2.0× |
+| 10²¹–10²² | 10⁴ | — | — | none |
+
+The gain switches off where $X \lesssim \sqrt{T/2\pi}$ (the Riemann–Siegel
+scale): below it the truncation deficit is coherent across neighbouring zeros
+and the self-computed seeds cannot see past it. Inside its domain the
+bootstrap reaches accuracies the $1/\log X$ law denies to $P_X$ at any
+feasible prime count. Derivation, stability analysis (guard ring, basin-hop
+rejection, the purely-imaginary-$E_1$ pitfall) and the validity threshold:
+[`doc/notes/bootstrap-hybrid.md`](doc/notes/bootstrap-hybrid.md).
+
+```bash
+$ time ./zzz --boot 32 -k 1000 -d 8 1e12 +1  # zero #10^12+1, true 267653395648.8475231
+267653395648.84975665                        # |err| 0.0022 (--ghy alone: 0.0041)
+
+real    0m12.7s
+```
 
 ## Zero counting function approximation
 
@@ -92,6 +129,12 @@ $ time ./zzz --ghy -k 10000 1e36 42420637374017961984
 
 real    0m0.631s
 ```
+
+At this height `--boot` is past its validity domain ($X = p_{10^4} \ll
+\sqrt{T/2\pi} \approx 10^{18}$): ensemble tests show no expected gain, and
+isolated improvements (e.g. `--boot 32` reaching …712.9936, error 0.0057)
+are fluctuations, not method. See
+[`doc/notes/bootstrap-hybrid.md`](doc/notes/bootstrap-hybrid.md).
 
 ## Chebyshev Psi Exact Formula
 
