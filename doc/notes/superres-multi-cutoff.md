@@ -269,4 +269,16 @@ an **exact identity** — zero model error; the only floor left is far-zero
 leakage through $\varphi$'s tails (Slepian-optimal concentration) versus
 the same band constraint. That isolates the genuinely open question:
 is the evanescent signal above the leakage floor at exact arithmetic?
-Untested; everything else in this note is now measured.
+
+**E4 step 1 — identity harness: validated to 34 digits.**
+`e4-weil-identity.wls` implements the formula above with
+$h(r) = H(r-T) + H(r+T)$, $H(x) = \mathrm{sinc}(bx)^{2q}$, band
+$a = 2qb = \log X$, whose Fourier partner $g(u) = 2\cos(Tu)\,\hat g_H(u)$
+is a cardinal B-spline vanishing identically for $|u| > \log X$ — the prime
+side cuts off at $p^m \le X$ *exactly*. Against Odlyzko's 1000-digit zeros
+(first 100, `zeros2`, X = 10⁵, T ∈ {γ₅₀, 143.5, 100}):
+$q{=}4$ closes to $10^{-16.4..-17.7}$ (the predicted sinc⁸ zero-tail floor,
+correct sign), $q{=}10$ closes to $10^{-34}$ at all three centers. Every
+constant in the formula is pinned. Next: step 2, the singular-spectrum
+probe of the linearized recovery problem at the proxy regime — the go/no-go
+measurement for sub-Rayleigh extraction.
