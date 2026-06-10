@@ -164,8 +164,17 @@ essentially optimal:
   notes: undamped Gauss–Newton diverges at larger k (linearization radius
   $\sim 1/\omega_{\max}$) — Levenberg–Marquardt with a 0.3-gap step clip
   is required; the k=2×10⁵ run had not fully converged at 24 iterations,
-  so its figure is an underestimate. Natural packaging: a `--weil` mode in
-  C (kernel in `ghy.{c,h}`, argp flag), iterating window-by-window.
+  so its figure is an underestimate. **Packaged same day as `zzz --weil`**
+  (kernel `weil.{c,h}`, driver `main.c::weil_locate`): marching B seeds at
+  `min(k, 10⁴)`, window ±12 / background ±20 t-units, per-component step
+  clipping with a tight prior (σ_p = 0.03 gap — the only regularization of
+  the no-data-support window-edge zeros), 192-bit `arb_mat_solve` normal
+  equations. Measured: n≈10³/k=10³ → mean |err| **2×10⁻⁵** in 2.8 s
+  (40× over `--boot`, ~750× over B; |ζ| at the refined zero ≈ 7×10⁻⁵ via
+  `-e`); 10¹²/k=10⁵ → **0.0028** (3.8× over boot, 6.4× over B; the
+  Wolfram prototype's 0.0020 used full-k far seeds). The fit window
+  geometry is height-independent in t-units because the kernel band
+  δ = 3 is fixed — defining it in gaps was the first port bug.
 - **An oracle.** Any external source of approximate neighbour ordinates
   (e.g. a partial zero database) immediately buys the measured E1 gains.
 

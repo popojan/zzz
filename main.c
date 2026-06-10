@@ -6,6 +6,7 @@
 #include <math.h>
 #include "argp.h"
 #include "ghy.h"
+#include "weil.h"
 
 #define CUBIC 1
 
@@ -984,6 +985,155 @@ static int boot_locate(arb_t out_t, const arb_t m0, slong W, slong rounds,
     return fail;
 }
 
+// --- Weil window fit driver (zzz --weil) ------------------------------------
+//
+// Seeds 2*FAR_GAPS+1 consecutive zeros with method B at a reduced prime count
+// (marching: each neighbour bisected from the previous + one mean gap), then
+// refines all zeros within WIN_GAPS mean gaps of the centre in one Weil
+// explicit-formula fit at the full cutoff (weil.h); the outer ring stays
+// fixed as background. Effective when gap*log(p_k) > pi; below that
+// threshold the fit provably returns the seeds (band-saturation.md).
+
+static int weil_locate(arb_struct *out, slong count, const arb_t m0,
+                       slong k, ulong X, double w0, double tol,
+                       slong PREC, int verbose)
+{
+    // spans in t-units: the kernel W (band delta = 3) supports ~|x| < 17
+    // independently of height, so window geometry must not scale with gap
+    const double WIN_T = 12.0, FAR_T = 20.0;
+    slong i, j, M = 0, nfar = 0;
+    int fail = 0;
+    double gap_d = 0.0;
+
+    arb_t mc, mj, m_half, guess, t_base, tmp;
+    arb_init(mc);
+    arb_init(mj);
+    arb_init(m_half);
+    arb_init(guess);
+    arb_init(t_base);
+    arb_init(tmp);
+
+    arb_add_si(mc, m0, (count - 1) / 2, PREC);
+
+    // seeding pass at reduced prime count (seeds need ~0.2 gap, not the
+    // full-k accuracy); centre first to learn the local gap, then march
+    slong seed_k = k < 10000 ? k : 10000;
+    zc_cfg cfg = { 0 };
+    cfg.method = 1;
+    cfg.X = n_nth_prime(seed_k);
+    cfg.skip = -1;
+
+    arb_t tc;
+    arb_init(tc);
+    arb_set_d(tmp, 0.5);
+    arb_sub(m_half, mc, tmp, PREC);
+    nt_inv(guess, mc, PREC);
+    fail = bisect_zero(tc, m_half, guess, w0, tol, 6, &cfg, PREC);
+
+    slong nspan = 0, n = 0;
+    arb_struct *tj = NULL;
+    if (!fail) {
+        double t_d = arf_get_d(arb_midref(tc), ARF_RND_NEAR);
+        gap_d = 2.0 * 3.14159265358979324 / log(t_d / (2.0 * 3.14159265358979324));
+        nspan = (slong) ceil(FAR_T / gap_d);
+        n = 2 * nspan + 1;
+
+        if (((count - 1) / 2.0) * gap_d > 0.5 * WIN_T) {
+            flint_fprintf(stderr,
+                "--weil: count too large at this height (max ~%wd per window)\n",
+                2 * (slong) (0.5 * WIN_T / gap_d) + 1);
+            fail = 1;
+        }
+        arb_set_si(tmp, nspan + 1);
+        if (!fail && arb_lt(mc, tmp)) {
+            flint_fprintf(stderr, "--weil: ordinal too small for the window span\n");
+            fail = 1;
+        }
+    }
+
+    if (!fail) {
+        tj = malloc(n * sizeof(arb_struct));
+        for (i = 0; i < n; ++i) arb_init(tj + i);
+        arb_set(tj + nspan, tc);
+        for (slong dir = -1; dir <= 1 && !fail; dir += 2) {
+            for (slong step = 1; step <= nspan && !fail; ++step) {
+                i = nspan + dir * step;
+                arb_add_si(mj, mc, dir * step, PREC);
+                arb_set_d(tmp, 0.5);
+                arb_sub(m_half, mj, tmp, PREC);
+                arb_set_d(tmp, dir * gap_d);
+                arb_add(guess, tj + (i - dir), tmp, PREC);
+                if (bisect_zero(tj + i, m_half, guess, 0.75 * gap_d, tol, 3, &cfg, PREC)) {
+                    nt_inv(guess, mj, PREC);
+                    fail = bisect_zero(tj + i, m_half, guess, w0, tol, 6, &cfg, PREC);
+                }
+            }
+        }
+    }
+    if (verbose && !fail)
+        flint_fprintf(stderr, "weil: %wd zeros seeded (marching, k=%wd)\n", n, seed_k);
+
+    double *xall = malloc((n > 0 ? n : 1) * sizeof(double));
+    double *xs = malloc((n > 0 ? n : 1) * sizeof(double));
+    double *far = malloc((n > 0 ? n : 1) * sizeof(double));
+    slong *pos_of = malloc((n > 0 ? n : 1) * sizeof(slong));
+
+    if (!fail) {
+        arb_set(t_base, tj + nspan);
+        for (i = 0; i < n; ++i) {
+            arb_sub(tmp, tj + i, t_base, PREC);
+            xall[i] = arf_get_d(arb_midref(tmp), ARF_RND_NEAR);
+            pos_of[i] = -1;
+        }
+        for (i = 0; i < n; ++i) {
+            if (fabs(xall[i]) <= WIN_T) {
+                pos_of[i] = M;
+                xs[M++] = xall[i];
+            } else {
+                far[nfar++] = xall[i];
+            }
+        }
+        if (verbose)
+            flint_fprintf(stderr, "weil: fitting %wd zeros (%wd background) at X=%wu\n",
+                          M, nfar, X);
+
+        weil_opts wo;
+        weil_opts_default(&wo);
+        wo.verbose = verbose;
+        fail = weil_fit(xs, M, far, nfar, t_base, X, &wo, PREC);
+    }
+
+    if (!fail) {
+        for (j = 0; j < count && !fail; ++j) {
+            i = j - (count - 1) / 2 + nspan;
+            if (i < 0 || i >= n || pos_of[i] < 0) {
+                flint_fprintf(stderr, "--weil: requested zero outside the fitted core\n");
+                fail = 1;
+            } else {
+                arb_set_d(tmp, xs[pos_of[i]]);
+                arb_add(out + j, t_base, tmp, PREC);
+            }
+        }
+    }
+
+    if (tj) {
+        for (i = 0; i < n; ++i) arb_clear(tj + i);
+        free(tj);
+    }
+    free(xall);
+    free(xs);
+    free(far);
+    free(pos_of);
+    arb_clear(tc);
+    arb_clear(mc);
+    arb_clear(mj);
+    arb_clear(m_half);
+    arb_clear(guess);
+    arb_clear(t_base);
+    arb_clear(tmp);
+    return fail;
+}
+
 const char *argp_program_version = "zzz 0";
 const char *argp_program_bug_address = "<>";
 static char doc[] = "fast approximation of large Riemann zeta zeros";
@@ -1002,6 +1152,7 @@ static struct argp_option options[] = {
         { "boot",  'B', "W", 0, "self-consistent hybrid bootstrap: seed 2W+1 zeros with P_X, then iterate leave-one-out P_X*Z_X relocation (implies --ghy)"},
         { "rounds",'R', "R", 0, "bootstrap relocation rounds [default 2]"},
         { "seeds", 'S', "FILE", 0, "bootstrap seeds from FILE: odd number of consecutive zero ordinates, one decimal per line, target in the middle; skips the P_X seeding pass (use -R 0 to relocate the target only)"},
+        { "weil",  'W', 0, 0, "Weil explicit-formula window fit: refine <count> consecutive zeros around ordinal N+offset in one shot; needs gap*log(p_k) > pi (see doc/notes/band-saturation.md)"},
         { 0 }
 };
 
@@ -1019,6 +1170,7 @@ struct arguments {
     slong boot;
     slong rounds;
     const char *seeds;
+    slong weil;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -1038,6 +1190,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 'B': arguments->boot = atol(arg); break;
         case 'R': arguments->rounds = atol(arg); break;
         case 'S': arguments->seeds = arg; break;
+        case 'W': arguments->weil = 1; break;
         case ARGP_KEY_ARG: return 0;
         default: return ARGP_ERR_UNKNOWN;
     }
@@ -1086,13 +1239,15 @@ int main(int argc, char *argv[])
     arguments.boot = 0;
     arguments.rounds = 2;
     arguments.seeds = NULL;
+    arguments.weil = 0;
 
     int arg_index = 1;
     argp_parse(&argp, argc, argv, ARGP_NO_ARGS, &arg_index, &arguments);
 
     // GHY mode: resolve X = p_k so the cost matches the heuristic's "k primes"
     ulong ghy_X = 0;
-    if ((arguments.ghy || arguments.boot > 0 || arguments.seeds) && arguments.k > 0) {
+    if ((arguments.ghy || arguments.boot > 0 || arguments.seeds || arguments.weil)
+        && arguments.k > 0) {
         ghy_X = n_nth_prime(arguments.k);
     }
 
@@ -1154,6 +1309,41 @@ int main(int argc, char *argv[])
             arf_printd(&zc->mid, arguments.DIGITS);
             flint_printf("\n");
         }
+    } else if (arguments.weil) {
+        arb_add(m0, m0, m, arguments.PREC);
+
+        slong cnt = count < 1 ? 1 : count;
+        nt_inv(tt, m0, arguments.PREC);
+        arb_const_log10(u, arguments.PREC);
+        arb_log(m, tt, arguments.PREC);
+        arb_div(u, m, u, arguments.PREC);
+        arb_ceil(u, u, arguments.PREC);
+        slong digits = arguments.DIGITS + arf_get_si(&u->mid, 0);
+
+        arb_struct *outz = malloc(cnt * sizeof(arb_struct));
+        for (slong j = 0; j < cnt; ++j) arb_init(outz + j);
+        if (weil_locate(outz, cnt, m0, arguments.k, ghy_X,
+                        arguments.w0, arguments.step0, arguments.PREC,
+                        arguments.verbose)) {
+            flint_fprintf(stderr, "weil fit failed\n");
+        } else {
+            for (slong j = 0; j < cnt; ++j) {
+                if (arguments.eval > 0) {
+                    acb_t zw;
+                    acb_init(zw);
+                    flint_fprintf(stderr, "value    z = \t");
+                    zeta(zw, outz + j, arguments.ZETA_PREC);
+                    acb_fprintd(stderr, zw, digits);
+                    flint_fprintf(stderr, "\n");
+                    acb_clear(zw);
+                }
+                arf_fprintd(stdout, &(outz + j)->mid, digits);
+                flint_fprintf(stdout, "\n");
+            }
+            fflush(stdout);
+        }
+        for (slong j = 0; j < cnt; ++j) arb_clear(outz + j);
+        free(outz);
     } else {
         arb_add(m0, m0, m, arguments.PREC);
 

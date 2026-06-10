@@ -24,6 +24,10 @@ fast approximation of large Riemann zeta zeros
   -v, --verbose              verbose progress output
   -w, --window=WIN           initial span around Lambert W asymptotic zero
                              location +- WIN [default 1.5]
+  -W, --weil                 Weil explicit-formula window fit: refine <count>
+                             consecutive zeros around ordinal N+offset in one
+                             shot; needs gap*log(p_k) > pi (see
+                             doc/notes/band-saturation.md)
   -z, --zeta-prec=ZETA_PREC  arb precision for zeta evaluation [default 64]
   -?, --help                 Give this help list
       --usage                Give a short usage message
@@ -61,6 +65,30 @@ bootstrap reaches accuracies the $1/\log X$ law denies to $P_X$ at any
 feasible prime count. Derivation, stability analysis (guard ring, basin-hop
 rejection, the purely-imaginary-$E_1$ pitfall) and the validity threshold:
 [`doc/notes/bootstrap-hybrid.md`](doc/notes/bootstrap-hybrid.md).
+
+## Weil window fit (`--weil`)
+
+Above the same threshold, `--weil` extracts the band's surplus optimally:
+it seeds a window of consecutive zeros with $P_X$ at a reduced prime count
+(marching), then refines all of them in one least-squares fit against exact
+Riemann–Weil functionals of the primes — no kernel approximation, the full
+field instead of one crossing per zero. Validated against Odlyzko:
+
+| height | k | `--ghy` | `--boot 32` | `--weil` |
+|---|---|---|---|---|
+| n ≈ 10³ | 1000 | 0.0153 | 0.0008 | **0.00002** (in 2.8 s) |
+| 10¹² | 10⁵ | 0.0176 | 0.0106 | **0.0028** (10 zeros in 1.8 min) |
+
+```bash
+$ ./zzz --weil -k 1000 996 0 9        # nine zeros around #1000, one window
+1415.585795                            # true 1415.585784795
+...
+1419.422456                            # true 1419.422480946 (B: 1419.447701)
+```
+
+Combines with `-e` to evaluate $\zeta$ at each refined zero. Kernel in
+`weil.{c,h}`; theory and the validity regime in
+[`doc/notes/band-saturation.md`](doc/notes/band-saturation.md).
 
 Below that threshold nothing can beat plain `--ghy` from the same primes:
 crossing relocation, kernel ML, multi-cutoff ML and exact Weil-identity
