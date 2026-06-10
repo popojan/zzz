@@ -134,7 +134,7 @@ essentially optimal:
 | regime | best method | measured accuracy |
 |---|---|---|
 | $\kappa \gtrsim 2\pi$ ($X \gtrsim T/2\pi$) | `--boot 32` | ~0.0008 at $n\sim10^3$, k=1000 — beyond any feasible plain-B budget |
-| $\pi \lesssim \kappa \lesssim 2\pi$ | `--boot 32` | 2–3× over `--ghy` |
+| $\pi \lesssim \kappa \lesssim 2\pi$ | Weil fit (E5 prototype; `--boot` second) | fit 8.6–14.7× over `--ghy` and 5–9× over `--boot` at $10^{12}$, k=1–2×10⁵; see "above-threshold constants" below |
 | $\kappa < \pi$ (e.g. $10^{36}$ at any feasible k) | plain `--ghy` | B is information-optimal; `--boot` is inert in expectation and multi-round can diverge |
 
 ## What could still change the picture (precisely bounded)
@@ -145,10 +145,27 @@ essentially optimal:
   continuum; quantization/positivity rigidity could in principle break the
   degeneracy at some far smaller scale. Five independent negatives weigh
   against it; nothing today tests below the floor.
-- **Above-threshold constants.** The exact-identity fit machinery has only
-  been run below threshold (where it ties B by necessity). Above
-  threshold it should beat the *bootstrap's* constants — it wastes no
-  information on crossing-reading. Untested.
+- **Above-threshold constants.** ~~Untested~~ — **tested same day (E5),
+  and it pays.** `e5-above-threshold.wls` + `.log`: the exact-identity fit
+  at $10^{12}{+}5000$, window ±12 (94 unknowns), far zone ±20 at B seeds,
+  114 functionals, scored against `zeros3`:
+
+  | k | $\kappa$ | B | `--boot 32` | Weil fit |
+  |---|---|---|---|---|
+  | 10⁵ | 3.61 | 0.01757 | 0.01059 (1.66×) | **0.00204 (8.6×, 5.2× over boot)** |
+  | 2×10⁵ | 3.81 | ~same | — | **0.00119 (14.7×, 8.9× over boot)** |
+
+  The fit beat the bootstrap on all 10 baseline zeros individually.
+  Doubling the primes improved the fit 1.7× (B improves ~5% — above
+  threshold the fit converts primes into accuracy at a power-law rate,
+  versus B's $1/\log X$). Practical economics: one fit refines ~90 zeros
+  from one prime pass plus ~300 B seed runs — at k=10⁵ roughly 80× less
+  compute per zero than `--boot`, at 5–9× better accuracy. Engineering
+  notes: undamped Gauss–Newton diverges at larger k (linearization radius
+  $\sim 1/\omega_{\max}$) — Levenberg–Marquardt with a 0.3-gap step clip
+  is required; the k=2×10⁵ run had not fully converged at 24 iterations,
+  so its figure is an underestimate. Natural packaging: a `--weil` mode in
+  C (kernel in `ghy.{c,h}`, argp flag), iterating window-by-window.
 - **An oracle.** Any external source of approximate neighbour ordinates
   (e.g. a partial zero database) immediately buys the measured E1 gains.
 
