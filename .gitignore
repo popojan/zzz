@@ -58,6 +58,7 @@ doc/refs/
 doc/pell/
 CLAUDE.md
 
-# zzz --loop runtime checkpoints
+# zzz --loop runtime checkpoints + per-run plots
 *.state
 *.state.tmp
+/loop-zero-errors.png
