@@ -5,32 +5,28 @@ fast approximation of large Riemann zeta zeros on the critical line
 Usage: zzz [OPTION...] N [offset] [count]
 fast approximation of large Riemann zeta zeros
 
-  -B, --boot=W               self-consistent hybrid bootstrap: seed 2W+1 zeros
-                             with P_X, then iterate leave-one-out P_X*Z_X
-                             relocation (implies --ghy)
-  -d, --digits=DIGITS        extra digits for number formatting [default 6]
-  -e, --evaluate             evaluate Riemann zeta function value at the
-                             approximate zero location
-  -g, --debug                debug counting function from <N> to <N+offset> in
-                             <count> steps
-  -G, --ghy                  use GHY partial Euler P_X (X = p_k) instead of
-                             heuristic damping
-  -k, --k=K                  use first k primes for zero counting function
-                             approximation [default 100]
-  -p, --precision=PREC       arb precision for counting function approximation
-                             [default 256]
+  -k, --k=K                  use first k primes for the counting function [default 100]
+  -e, --evaluate             evaluate zeta at the approximate zero location
+  -G, --ghy                  use GHY partial Euler P_X (X = p_k) instead of damping
+  -B, --boot=W               self-consistent hybrid bootstrap: seed 2W+1 zeros, iterate
+                             leave-one-out P_X*Z_X relocation (implies --ghy)
   -R, --rounds=R             bootstrap relocation rounds [default 2]
-  -t, --tolerance=TOL        tolerance for bisection [default 1e-6]
-  -v, --verbose              verbose progress output
-  -w, --window=WIN           initial span around Lambert W asymptotic zero
-                             location +- WIN [default 1.5]
-  -W, --weil                 Weil explicit-formula window fit: refine <count>
-                             consecutive zeros around ordinal N+offset in one
-                             shot; needs gap*log(p_k) > pi (see
-                             doc/notes/band-saturation.md)
+  -S, --seeds=FILE           external seed zeros for --boot/--weil: odd count, target
+                             in the middle (use -R 0 to relocate the target only)
+  -W, --weil                 Weil explicit-formula window fit; needs gap*log(p_k) > pi
+                             (see doc/notes/band-saturation.md)
+  -L, --loop                 self-paving zeros<->primes bootstrap (zeta-free,
+                             primality-free): derive primes from zeros and zeros from
+                             primes; streams primes, auto-resumes, Ctrl+C-able
+                             (--resume, --loop-{batch,kmin,nmax,contrast,...}; --help)
+  -d, --digits=DIGITS        extra digits for number formatting [default 6]
+  -p, --precision=PREC       arb precision for the counting function [default 256]
   -z, --zeta-prec=ZETA_PREC  arb precision for zeta evaluation [default 64]
+  -t, --tolerance=TOL        tolerance for bisection [default 1e-6]
+  -w, --window=WIN           initial span +- WIN around the asymptotic location [def 1.5]
+  -v, --verbose              verbose progress output
+  -g, --debug                debug counting function from <N> to <N+offset> in <count>
   -?, --help                 Give this help list
-      --usage                Give a short usage message
   -V, --version              Print program version
 ```
 
@@ -105,6 +101,34 @@ $ time ./zzz --boot 32 -k 1000 -d 8 1e12 +1  # zero #10^12+1, true 267653395648.
 
 real    0m12.7s
 ```
+
+## Self-paving prime ⇄ zero bootstrap (`--loop`)
+
+The explicit formula runs *both* ways: primes → zeros (what every counter above
+does) and zeros → primes (the Chebyshev $\psi'$ comb peaks at prime powers — the
+panel near the end of this README shows the reconstruction). `--loop` closes the
+loop and lets it run unattended: from a finite seed of zero ordinates it detects
+primes from the $\psi'$ signal, locates more zeros from a method-B sum over
+*those* primes, and repeats — with **no $\zeta$ evaluation and no primality
+test** in the loop body. The loop never confirms its own primes (that would
+defeat the purpose); checked *post-hoc* against a sieve they are all correct
+(0 false positives, none missed). It auto-resumes from a checkpoint and is
+Ctrl+C-able.
+
+```bash
+$ ./zzz --loop | head     # primes derived from zeros; Ctrl+C anytime, rerun to resume
+2                         # X_known climbs 54 -> 104 -> 314 -> 1125 -> ... (188 primes, all correct)
+3
+5
+...
+```
+
+It is a *demonstration* (plain method-B forward, double precision, modest
+heights): the prime bound grows super-critically for a finite stretch, gated by
+the band-saturation $\sqrt{T/2\pi}$ wall, not by precision. A fit-free
+local-contrast detector (`--loop-contrast`) drops even the empirical $\psi'$
+envelope. Mechanism, the contraction-map ceiling, the detector A/B and the
+seed-count limits: [`doc/notes/zeros-primes-bootstrap.md`](doc/notes/zeros-primes-bootstrap.md).
 
 ## Zero counting function approximation
 
