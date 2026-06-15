@@ -7,6 +7,7 @@
 #include "argp.h"
 #include "ghy.h"
 #include "weil.h"
+#include "loop.h"
 
 #define CUBIC 1
 
@@ -996,7 +997,7 @@ static int boot_locate(arb_t out_t, const arb_t m0, slong W, slong rounds,
 
 static int weil_locate(arb_struct *out, slong count, const arb_t m0,
                        slong k, ulong X, double w0, double tol,
-                       slong PREC, int verbose)
+                       slong PREC, int verbose, const char *seeds_path)
 {
     // spans in t-units: the kernel W (band delta = 3) supports ~|x| < 17
     // independently of height, so window geometry must not scale with gap
@@ -1015,63 +1016,97 @@ static int weil_locate(arb_struct *out, slong count, const arb_t m0,
 
     arb_add_si(mc, m0, (count - 1) / 2, PREC);
 
-    // seeding pass at reduced prime count (seeds need ~0.2 gap, not the
-    // full-k accuracy); centre first to learn the local gap, then march
-    slong seed_k = k < 10000 ? k : 10000;
-    zc_cfg cfg = { 0 };
-    cfg.method = 1;
-    cfg.X = n_nth_prime(seed_k);
-    cfg.skip = -1;
-
     arb_t tc;
     arb_init(tc);
-    arb_set_d(tmp, 0.5);
-    arb_sub(m_half, mc, tmp, PREC);
-    nt_inv(guess, mc, PREC);
-    fail = bisect_zero(tc, m_half, guess, w0, tol, 6, &cfg, PREC);
-
     slong nspan = 0, n = 0;
     arb_struct *tj = NULL;
-    if (!fail) {
-        double t_d = arf_get_d(arb_midref(tc), ARF_RND_NEAR);
-        gap_d = 2.0 * 3.14159265358979324 / log(t_d / (2.0 * 3.14159265358979324));
-        nspan = (slong) ceil(FAR_T / gap_d);
-        n = 2 * nspan + 1;
 
-        if (((count - 1) / 2.0) * gap_d > 0.5 * WIN_T) {
+    if (seeds_path) {
+        // external seeds (mixed exact + self-seeded): an odd number of
+        // consecutive ordinates, window centre (zero #mc) on the middle line.
+        // The marching B pass is skipped; the fit refines the in-window zeros
+        // toward the (now possibly exact) prior and holds the ring fixed.
+        n = load_seed_ordinates(seeds_path, &tj, PREC);
+        if (n < 0) {
+            fail = 1;
+        } else if (n < 3 || n % 2 == 0) {
             flint_fprintf(stderr,
-                "--weil: count too large at this height (max ~%wd per window)\n",
-                2 * (slong) (0.5 * WIN_T / gap_d) + 1);
+                "--weil seeds: need an odd number (>= 3) of consecutive zeros, got %wd\n", n);
             fail = 1;
+        } else {
+            nspan = n / 2;
+            arb_set(tc, tj + nspan);
+            double t_d = arf_get_d(arb_midref(tc), ARF_RND_NEAR);
+            gap_d = 2.0 * 3.14159265358979324 / log(t_d / (2.0 * 3.14159265358979324));
+            if (((count - 1) / 2.0) * gap_d > 0.5 * WIN_T) {
+                flint_fprintf(stderr,
+                    "--weil: count too large at this height (max ~%wd per window)\n",
+                    2 * (slong) (0.5 * WIN_T / gap_d) + 1);
+                fail = 1;
+            }
+            if (!fail && (count - 1) / 2 > nspan) {
+                flint_fprintf(stderr,
+                    "--weil seeds: file too short for the requested count\n");
+                fail = 1;
+            }
         }
-        arb_set_si(tmp, nspan + 1);
-        if (!fail && arb_lt(mc, tmp)) {
-            flint_fprintf(stderr, "--weil: ordinal too small for the window span\n");
-            fail = 1;
-        }
-    }
+        if (verbose && !fail)
+            flint_fprintf(stderr, "weil: %wd zeros read from %s\n", n, seeds_path);
+    } else {
+        // seeding pass at reduced prime count (seeds need ~0.2 gap, not the
+        // full-k accuracy); centre first to learn the local gap, then march
+        slong seed_k = k < 10000 ? k : 10000;
+        zc_cfg cfg = { 0 };
+        cfg.method = 1;
+        cfg.X = n_nth_prime(seed_k);
+        cfg.skip = -1;
 
-    if (!fail) {
-        tj = malloc(n * sizeof(arb_struct));
-        for (i = 0; i < n; ++i) arb_init(tj + i);
-        arb_set(tj + nspan, tc);
-        for (slong dir = -1; dir <= 1 && !fail; dir += 2) {
-            for (slong step = 1; step <= nspan && !fail; ++step) {
-                i = nspan + dir * step;
-                arb_add_si(mj, mc, dir * step, PREC);
-                arb_set_d(tmp, 0.5);
-                arb_sub(m_half, mj, tmp, PREC);
-                arb_set_d(tmp, dir * gap_d);
-                arb_add(guess, tj + (i - dir), tmp, PREC);
-                if (bisect_zero(tj + i, m_half, guess, 0.75 * gap_d, tol, 3, &cfg, PREC)) {
-                    nt_inv(guess, mj, PREC);
-                    fail = bisect_zero(tj + i, m_half, guess, w0, tol, 6, &cfg, PREC);
+        arb_set_d(tmp, 0.5);
+        arb_sub(m_half, mc, tmp, PREC);
+        nt_inv(guess, mc, PREC);
+        fail = bisect_zero(tc, m_half, guess, w0, tol, 6, &cfg, PREC);
+
+        if (!fail) {
+            double t_d = arf_get_d(arb_midref(tc), ARF_RND_NEAR);
+            gap_d = 2.0 * 3.14159265358979324 / log(t_d / (2.0 * 3.14159265358979324));
+            nspan = (slong) ceil(FAR_T / gap_d);
+            n = 2 * nspan + 1;
+
+            if (((count - 1) / 2.0) * gap_d > 0.5 * WIN_T) {
+                flint_fprintf(stderr,
+                    "--weil: count too large at this height (max ~%wd per window)\n",
+                    2 * (slong) (0.5 * WIN_T / gap_d) + 1);
+                fail = 1;
+            }
+            arb_set_si(tmp, nspan + 1);
+            if (!fail && arb_lt(mc, tmp)) {
+                flint_fprintf(stderr, "--weil: ordinal too small for the window span\n");
+                fail = 1;
+            }
+        }
+
+        if (!fail) {
+            tj = malloc(n * sizeof(arb_struct));
+            for (i = 0; i < n; ++i) arb_init(tj + i);
+            arb_set(tj + nspan, tc);
+            for (slong dir = -1; dir <= 1 && !fail; dir += 2) {
+                for (slong step = 1; step <= nspan && !fail; ++step) {
+                    i = nspan + dir * step;
+                    arb_add_si(mj, mc, dir * step, PREC);
+                    arb_set_d(tmp, 0.5);
+                    arb_sub(m_half, mj, tmp, PREC);
+                    arb_set_d(tmp, dir * gap_d);
+                    arb_add(guess, tj + (i - dir), tmp, PREC);
+                    if (bisect_zero(tj + i, m_half, guess, 0.75 * gap_d, tol, 3, &cfg, PREC)) {
+                        nt_inv(guess, mj, PREC);
+                        fail = bisect_zero(tj + i, m_half, guess, w0, tol, 6, &cfg, PREC);
+                    }
                 }
             }
         }
+        if (verbose && !fail)
+            flint_fprintf(stderr, "weil: %wd zeros seeded (marching, k=%wd)\n", n, seed_k);
     }
-    if (verbose && !fail)
-        flint_fprintf(stderr, "weil: %wd zeros seeded (marching, k=%wd)\n", n, seed_k);
 
     double *xall = malloc((n > 0 ? n : 1) * sizeof(double));
     double *xs = malloc((n > 0 ? n : 1) * sizeof(double));
@@ -1153,6 +1188,15 @@ static struct argp_option options[] = {
         { "rounds",'R', "R", 0, "bootstrap relocation rounds [default 2]"},
         { "seeds", 'S', "FILE", 0, "bootstrap seeds from FILE: odd number of consecutive zero ordinates, one decimal per line, target in the middle; skips the P_X seeding pass (use -R 0 to relocate the target only)"},
         { "weil",  'W', 0, 0, "Weil explicit-formula window fit: refine <count> consecutive zeros around ordinal N+offset in one shot; needs gap*log(p_k) > pi (see doc/notes/band-saturation.md)"},
+        { "loop",  'L', 0, 0, "self-paving zeros<->primes bootstrap (zeta-free, primality-free): derive primes from zeros and zeros from primes, alternating; streams primes to stdout, checkpoints for --resume (see doc/notes/zeros-primes-bootstrap.md)"},
+        { "resume", 1001, 0, 0, "--loop: resume from the checkpoint file instead of the seed"},
+        { "loop-state", 1002, "FILE", 0, "--loop: checkpoint path [zzz-loop.state]"},
+        { "loop-nmax", 1003, "N", 0, "--loop: zero-list cap [200000]"},
+        { "loop-kmin", 1004, "K", 0, "--loop: starting kappa margin for the forward step [5.0]"},
+        { "loop-kmin-floor", 1005, "K", 0, "--loop: anneal stops at this margin [3.5]"},
+        { "loop-no-anneal", 1006, 0, 0, "--loop: keep kappa fixed (stall at one ceiling) instead of auto-annealing"},
+        { "loop-seed", 1007, "N", 0, "--loop: use only the first N built-in seed zeros (min 6)"},
+        { "loop-contrast", 1008, 0, 0, "--loop: fit-free local-contrast detector (no Li envelope; warm-starts with 10 primes)"},
         { 0 }
 };
 
@@ -1171,6 +1215,15 @@ struct arguments {
     slong rounds;
     const char *seeds;
     slong weil;
+    slong loop;
+    slong resume;
+    const char *loop_state;
+    slong loop_nmax;
+    double loop_kmin;
+    double loop_kmin_floor;
+    slong loop_anneal;
+    slong loop_seed;
+    slong loop_contrast;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -1191,6 +1244,15 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 'R': arguments->rounds = atol(arg); break;
         case 'S': arguments->seeds = arg; break;
         case 'W': arguments->weil = 1; break;
+        case 'L': arguments->loop = 1; break;
+        case 1001: arguments->resume = 1; break;
+        case 1002: arguments->loop_state = arg; break;
+        case 1003: arguments->loop_nmax = atol(arg); break;
+        case 1004: arguments->loop_kmin = atof(arg); break;
+        case 1005: arguments->loop_kmin_floor = atof(arg); break;
+        case 1006: arguments->loop_anneal = 0; break;
+        case 1007: arguments->loop_seed = atol(arg); break;
+        case 1008: arguments->loop_contrast = 1; break;
         case ARGP_KEY_ARG: return 0;
         default: return ARGP_ERR_UNKNOWN;
     }
@@ -1240,9 +1302,34 @@ int main(int argc, char *argv[])
     arguments.rounds = 2;
     arguments.seeds = NULL;
     arguments.weil = 0;
+    arguments.loop = 0;
+    arguments.resume = 0;
+    arguments.loop_state = NULL;
+    arguments.loop_nmax = 0;
+    arguments.loop_kmin = 0.0;
+    arguments.loop_kmin_floor = 0.0;
+    arguments.loop_anneal = 1;
+    arguments.loop_seed = 0;
+    arguments.loop_contrast = 0;
 
     int arg_index = 1;
     argp_parse(&argp, argc, argv, ARGP_NO_ARGS, &arg_index, &arguments);
+
+    // self-paving zeros<->primes bootstrap: standalone, returns immediately
+    if (arguments.loop || arguments.resume) {
+        loop_opts lo;
+        loop_opts_default(&lo);
+        lo.resume = arguments.resume;
+        if (arguments.loop_state) lo.state_path = arguments.loop_state;
+        if (arguments.loop_nmax > 0) lo.nmax_zeros = arguments.loop_nmax;
+        if (arguments.loop_kmin > 0.0) { lo.kmin = arguments.loop_kmin; lo.kmin_set = 1; }
+        if (arguments.loop_kmin_floor > 0.0) lo.kmin_floor = arguments.loop_kmin_floor;
+        lo.anneal = arguments.loop_anneal;
+        lo.seed_n = arguments.loop_seed;
+        lo.contrast = arguments.loop_contrast;
+        lo.verbose = arguments.verbose;
+        return loop_run(&lo);
+    }
 
     // GHY mode: resolve X = p_k so the cost matches the heuristic's "k primes"
     ulong ghy_X = 0;
@@ -1324,7 +1411,7 @@ int main(int argc, char *argv[])
         for (slong j = 0; j < cnt; ++j) arb_init(outz + j);
         if (weil_locate(outz, cnt, m0, arguments.k, ghy_X,
                         arguments.w0, arguments.step0, arguments.PREC,
-                        arguments.verbose)) {
+                        arguments.verbose, arguments.seeds)) {
             flint_fprintf(stderr, "weil fit failed\n");
         } else {
             for (slong j = 0; j < cnt; ++j) {

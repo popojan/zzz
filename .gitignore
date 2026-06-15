@@ -57,3 +57,7 @@ dkms.conf
 doc/refs/
 doc/pell/
 CLAUDE.md
+
+# zzz --loop runtime checkpoints
+*.state
+*.state.tmp

@@ -33,7 +33,7 @@ ELSE()
     link_libraries(gmp flint mpfr)
 ENDIF()
 
-add_library(ghy STATIC ghy.c weil.c)
+add_library(ghy STATIC ghy.c weil.c loop.c)
 
 add_executable(zzz main.c)
 add_executable(zproxy zproxy.c)
