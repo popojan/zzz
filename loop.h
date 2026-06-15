@@ -25,6 +25,8 @@ typedef struct {
     int anneal;              // on stall, lower kmin and keep climbing [1]
     long seed_n;             // use only the first seed_n seed zeros (0 = all)
     int contrast;            // use the fit-free local-contrast detector (no Li)
+    long batch;              // zeros per re-detect (smooth streaming) [2000; 0=all]
+    int fresh;               // force a fresh start, ignoring any checkpoint
     int verbose;
 } loop_opts;
 

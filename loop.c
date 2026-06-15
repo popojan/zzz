@@ -159,11 +159,12 @@ static double locate_march(long k, const state *st, long X, double prev) {
     return 0.5 * (lo + hi);
 }
 
-// backward: scan x upward, detect prime powers from the psi' peak, append new
-// primes; conservative stop at the first ambiguous non-(known-power). Returns X_known.
-static long backward(state *st, long Xcap) {
-    long n = st->nz, Xk = 1;
-    for (long x = 2; x <= Xcap; ++x) {
+// backward: scan x from x_start upward (primes below x_start already known),
+// detect prime powers from the psi' peak, append new primes; conservative stop
+// at the first ambiguous non-(known-power). Returns the reach X_known.
+static long backward(state *st, long x_start, long Xcap) {
+    long n = st->nz, Xk = x_start - 1;
+    for (long x = x_start; x <= Xcap; ++x) {
         double r = psi_prime((double)x, st->z, n) / envelope((double)x, n);
         int kp = is_known_pow(x, st);
         if (r > TAU) {                                     // clear prime power
@@ -179,13 +180,14 @@ static long backward(state *st, long Xcap) {
 }
 
 // fit-free variant: local-contrast (CFAR) detection, no envelope/Li
-static long backward_contrast(state *st, long Xcap) {
-    long n = st->nz, Xk = 1;
+static long backward_contrast(state *st, long x_start, long Xcap) {
+    long n = st->nz, Xk = x_start - 1;
     const int W = 6;
+    long plo = x_start - W; if (plo < 2) plo = 2;
     double *pv = malloc((Xcap + 1) * sizeof(double));
-    for (long x = 2; x <= Xcap; ++x) pv[x] = psi_prime((double)x, st->z, n);
+    for (long x = plo; x <= Xcap; ++x) pv[x] = psi_prime((double)x, st->z, n);
     double buf[64], tmp[64];
-    for (long x = 2; x <= Xcap; ++x) {
+    for (long x = x_start; x <= Xcap; ++x) {
         int m = 0;
         for (long j = x - W; j <= x + W; ++j)
             if (j >= 2 && j <= Xcap && j != x) buf[m++] = pv[j];
@@ -270,14 +272,29 @@ void loop_opts_default(loop_opts *o) {
     o->anneal = 1;
     o->seed_n = 0;
     o->contrast = 0;
+    o->batch = 2000;
+    o->fresh = 0;
     o->verbose = 0;
+}
+
+static int file_exists(const char *path) {
+    FILE *f = fopen(path, "r");
+    if (f) { fclose(f); return 1; }
+    return 0;
 }
 
 int loop_run(const loop_opts *o) {
     state st; memset(&st, 0, sizeof st);
 
+    // auto-resume: bare --loop continues from a checkpoint if one is present.
+    int resume = o->fresh ? 0 : (o->resume ? 1 : file_exists(o->state_path));
+    if (o->resume && !file_exists(o->state_path)) {
+        fprintf(stderr, "loop: --resume but no checkpoint at %s\n", o->state_path);
+        return 1;
+    }
+
     st.kmin = o->kmin;
-    if (o->resume) {
+    if (resume) {
         if (load_state(&st, o->state_path)) return 1;   // restores st.kmin too
         if (o->kmin_set) st.kmin = o->kmin;             // explicit --loop-kmin overrides
     } else {
@@ -298,22 +315,31 @@ int loop_run(const loop_opts *o) {
     long prev_X = st.Xknown, stalled = 0, best_X = st.Xknown, no_improve = 0;
     while (!g_stop && (o->max_iters == 0 || st.iter < o->max_iters)) {
         st.iter++;
+        // re-detect from just below the known frontier (lower primes already found),
+        // so frequent re-detection stays cheap with small forward batches
         long Xcap = (long)(1.4 * st.nz); if (Xcap > 2000) Xcap = 2000;
-        long Xnew = o->contrast ? backward_contrast(&st, Xcap)   // streams new primes
-                                : backward(&st, Xcap);
+        long x0 = st.Xknown - 16; if (x0 < 2) x0 = 2;
+        long Xnew = o->contrast ? backward_contrast(&st, x0, Xcap)   // streams new primes
+                                : backward(&st, x0, Xcap);
         if (Xnew > st.Xknown) st.Xknown = Xnew;
 
+        // forward only a batch of zeros, so primes stream smoothly (Ctrl+C-able)
         long nt = n_frontier(st.Xknown, st.kmin, o->nmax_zeros);
-        for (long k = st.nz + 1; k <= nt && !g_stop; ++k)
+        long target = nt;
+        if (o->batch > 0 && target > st.nz + o->batch) target = st.nz + o->batch;
+        for (long k = st.nz + 1; k <= target && !g_stop; ++k)
             z_push(&st, locate_march(k, &st, st.Xknown, st.z[st.nz - 1]));
 
-        fprintf(stderr, "loop: iter %ld  X_known=%ld  primes=%ld  zeros=%ld  kmin=%.3f\n",
-                st.iter, st.Xknown, st.np, st.nz, st.kmin);
+        if (o->verbose || st.Xknown != prev_X)
+            fprintf(stderr, "loop: iter %ld  X_known=%ld  primes=%ld  zeros=%ld  kmin=%.3f\n",
+                    st.iter, st.Xknown, st.np, st.nz, st.kmin);
 
         save_state(&st, o->state_path);
 
         if (st.Xknown > best_X) best_X = st.Xknown;
-        if (st.Xknown == prev_X) {
+        if (st.Xknown > prev_X) {                          // progress: reach grew
+            prev_X = st.Xknown; stalled = 0;
+        } else if (st.nz >= nt) {                          // forward exhausted, reach flat
             if (++stalled >= 2) {
                 // fixed point at this kmin: anneal the margin down and keep climbing
                 no_improve = (st.Xknown >= best_X) ? 0 : no_improve + 1;
@@ -328,7 +354,7 @@ int loop_run(const loop_opts *o) {
                         st.Xknown, st.kmin);
                 stalled = 0; prev_X = -1;
             }
-        } else { stalled = 0; prev_X = st.Xknown; }
+        }                                                  // else: still filling forward
         if (st.nz >= o->nmax_zeros) {
             fprintf(stderr, "loop: hit zero cap %ld; raise --loop-nmax to continue\n", o->nmax_zeros);
             break;

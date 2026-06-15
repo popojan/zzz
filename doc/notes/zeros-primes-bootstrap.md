@@ -120,9 +120,38 @@ ceiling, `--loop` automatically lowers $\mathrm{kmin}$ (×0.9) whenever it stall
 climbs through successive ceilings on its own and stops at the plain-B wall with an honest message
 ("go further with a sharper/Weil forward step"). The conservative detector emits no false primes at
 any margin, so annealing is safe. `--loop-no-anneal` keeps $\mathrm{kmin}$ fixed (stalls at one
-ceiling, for the contraction-map analysis); `--resume` carries the annealed margin in the checkpoint.
+ceiling, for the contraction-map analysis); the checkpoint carries the annealed margin.
 This realises the "feed forward" loop directly: the *sequence* is unbounded in principle, gated by
 the floor at $\pi$ (the $\sqrt T$ wall), not by manual orchestration.
+
+**Out-of-the-box UX.** `./zzz --loop` **auto-resumes** if a checkpoint exists at the state path,
+else starts fresh — so: run it, Ctrl+C anytime (it checkpoints), run `--loop` again to continue.
+`--loop-batch N` (default 2000) computes only N zeros per re-detect, so primes **stream smoothly**
+rather than in big silent bursts (the detect is frontier-incremental, so frequent re-detection is
+cheap). `--loop-fresh` forces a fresh start; `--resume` is the explicit form (errors if no
+checkpoint). Verified end-to-end: interrupt at X=1293, relaunch, auto-resume to X=1643 — 259 primes,
+all correct.
+
+**Two detectors (A/B).** Same budget, both with **zero false positives**:
+
+| detector | fitted constant | primes | reach X | min seed |
+|---|---|---|---|---|
+| envelope (default) | Li form + 20/4 (matched-filter peak scale) | 65 | 313 | 6 zeros, 0 primes |
+| `--loop-contrast` | **none** (dimensionless SNR threshold) | 34 | 139 | 6 zeros + ~10 primes |
+
+The contrast (CFAR) filter proves the loop runs **without the Li envelope** — only a fit-free SNR
+threshold — at ~2× less reach per budget (its local-MAD scale is noisier near the limit than the
+envelope's absolute peak-height law). Soundness of the envelope rests not on its tuned constant but
+on two *provable* facts: composites have $\psi'\approx0$ structurally, and the truncation turns each
+prime-power delta into a Dirichlet-kernel peak of height $\propto\gamma_n\log x/x$ (and
+$\mathrm{Li}(n)\approx\gamma_n/2\pi$). The naive textbook detector $\int\psi'=\Lambda$ *fails* under
+truncation (the uncancelled $+1$ baseline), so the matched-filter normalisation is doing real work.
+
+**Minimum seed.** The pure "1 zero + {2,3}" is below the floor: one zero is a single cosine and
+locates no prime; the explicit-formula sum needs a *handful* (~6) to resolve even x=2,3. The
+contrast detector additionally needs ~10 warm-start primes because at small x almost every integer
+*is* a prime power (no composite floor for the local median) — structural, not tuning. So the
+irreducible seed is "~6 zeros + one normalisation handle" (absolute scale, or ~10 warm primes).
 
 **Verdict.** Informationally consistent and **asymptotically critical**: the loop
 self-paves and the prime bound grows for as long as the zero supply grows, but it
