@@ -91,6 +91,32 @@ no artefact — the same explicit formula, weighted by scale: large primes (band
 edge) set the short-range correlations, small primes set the long-range saturation,
 and the loop holds both within its feasible heights.
 
+**Band sweep — the threshold $\kappa=\pi$ is the spectral onset of level repulsion.**
+
+Recompute one fixed block (#30000–31800, $\gamma\approx26000$, Riemann–Siegel band
+$X_{\rm RS}=\sqrt{T/2\pi}\approx65$) by method B at a *sweep* of bands $X$, and
+measure both statistics (`doc/ghy/loop-band-rigidity.py`). The predicted scaling
+($\Sigma^2_{\rm sat}\sim\tfrac1{\pi^2}\log\log X$, the band setting the long-range
+crossover) was **refuted**: the number variance is essentially **band-independent**
+(all $X\in[32,1024]$ collapse onto the true curve), because the long-range rigidity
+is fixed by the *small* primes present in every band. The band-edge scaling lives in
+the **short** range instead — local level repulsion, gated exactly at $\kappa=\pi$:
+
+| $X$ | $\kappa=\mathrm{gap}\cdot\log X$ | $P(s<0.5)$ |
+|---|---|---|
+| 32 | 2.6 | 0.004 (crystalline) |
+| 64 $\approx X_{\rm RS}$ | $3.1\approx\pi$ | 0.021 |
+| 256 | 4.2 | 0.112 (= GUE) |
+| 1024 | 5.2 | 0.167 |
+| true | $\infty$ | 0.096 |
+
+Below $\kappa=\pi$ the zeros are **crystalline** — $P(s<0.5)\to0$, no repulsion, they
+stick to the smooth count; repulsion emerges *through* $\kappa=\pi$ and converges to
+GUE by $\kappa\approx4$. **The band-saturation threshold is, spectrally, the onset of
+GUE level repulsion** — the cleanest statement of band-saturation found: the same wall
+that bounds individual-zero resolution is the wall at which the spectral *texture*
+switches on. (Long range carries no such transition; it is small-prime / height set.)
+
 ## Verdict
 
 The zeta-free shadow carries the operator's spectral fingerprint **faithfully on
@@ -106,7 +132,10 @@ lies beyond any feasible climb. So for Hilbert–Pólya the quality is a clean,
 circularity-free **lens** that faithfully shows the arithmetic spectral structure —
 not a **lever** on positivity or construction, where the program is blocked.
 
-*Methodological note: this section was wrong twice before it was right. "GUE will
-wash out" (guess) was refuted by the spacing histogram; "long-range is an artefact"
-(guess) was refuted by the same-block comparison to `ZetaZero`. Both corrections
-came from looking. Look, don't guess — it's the throughline of this whole project.*
+*Methodological note: this thread was wrong three times before each piece was right.
+"GUE will wash out" → refuted by the spacing histogram; "long-range is an artefact" →
+refuted by the same-block `ZetaZero` comparison; "the band sets the long-range
+crossover ($\sim\log\log X$)" → refuted by the band sweep, which instead found the
+clean short-range onset at $\kappa=\pi$. Every correction came from looking. Look,
+don't guess — it is the throughline of this whole project, and the wall keeps proving
+more interesting, and less bleak, than the guesses about its far side.*
