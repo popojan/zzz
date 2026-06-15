@@ -84,10 +84,10 @@ def main():
         d = delta3(L)
         print(f"  {L:5} {d:11.3f} {d3_gue(L):8.3f} {L/15:9.3f}")
 
-    print("\nverdict: nearest-neighbour spacing ~ GUE (local level repulsion survives the error),")
-    print("         BUT Sigma^2(L) and Delta_3(L) SATURATE below GUE's (1/pi^2)logL -> OVER-rigid")
-    print("         at long range: the band-limited prime sum misses the long-range fluctuations of")
-    print("         S(t)=arg zeta/pi, pinning zeros to the smooth count (band-saturation, spectral form).")
+    print("\nverdict: nearest-neighbour spacing ~ GUE (local level repulsion survives the error).")
+    print("         Sigma^2(L), Delta_3(L) SATURATE below GUE's (1/pi^2)logL -- but the TRUE zeros")
+    print("         saturate too at finite height (Berry semiclassical, set by the short primes);")
+    print("         loop-vs-true-sigma2.py confirms the loop REPRODUCES it, not an artifact.")
     return 0
 
 

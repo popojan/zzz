@@ -66,36 +66,47 @@ in spacings, so local level repulsion passes through intact. (The very smallest
 $s$ is additionally floored by the marching bracket, so that end is
 algorithm-limited, not physics.)
 
-**Long range — over-rigid, an artefact (the genuinely new finding).**
+**Long range — saturated, and the loop reproduces it (corrected finding).**
 
-| $L$ | $\Sigma^2_{\rm obs}$ | GUE $\tfrac{1}{\pi^2}\log$ | Poisson $L$ | $\Delta_3^{\rm obs}$ | GUE | Poisson $L/15$ |
-|---|---|---|---|---|---|---|
-| 5  | 0.44 | 0.51 | 5   | 0.143 | 0.156 | 0.33 |
-| 20 | 0.42 | 0.65 | 20  | 0.190 | 0.297 | 1.33 |
-| 50 | 0.42 | 0.74 | 50  | 0.193 | 0.389 | 3.33 |
-| 200| 0.40 | 0.88 | 200 | — | — | — |
+$\Sigma^2(L)$ and $\Delta_3(L)$ for the loop *saturate* (~0.4, ~0.19) instead of
+growing like GUE's $\tfrac1{\pi^2}\log L$. My first reading was "over-rigid
+artefact." **That was wrong** — the *true* zeros saturate too. Comparing the loop
+to `ZetaZero` over the **same index block** (#30000–31800, $\gamma\approx25755$;
+`doc/ghy/loop-vs-true-sigma2.py`):
 
-$\Sigma^2(L)$ and $\Delta_3(L)$ **saturate** (~0.4, ~0.19) instead of growing like
-$\log L$ — the loop's zeros are *more rigid than the true zeros.* Mechanism: the
-loop fixes $N_0(\gamma_k)+\tfrac1\pi\arg P_X = k-\tfrac12$, so unfolding by $N_0$
-leaves only the **band-limited** fluctuation $\tfrac1\pi\arg P_X$, the truncated-
-prime approximation to $S(t)=\tfrac1\pi\arg\zeta$. The long-range rigidity
-$\Sigma^2\sim\log L$ lives in the fluctuation content $\arg P_X$ **cannot reach**;
-the loop therefore pins zeros to the smooth count and manufactures an artificial
-super-rigidity. Band-saturation, in spectral-statistics form: **the band carries
-short-range correlations faithfully and long-range rigidity not at all.**
+| $L$ | $\Sigma^2_{\rm TRUE}$ | $\Sigma^2_{\rm LOOP}$ | GUE $\tfrac1{\pi^2}\log$ |
+|---|---|---|---|
+| 2  | 0.370 | 0.397 | 0.416 |
+| 10 | 0.335 | 0.355 | 0.579 |
+| 20 | 0.383 | 0.407 | 0.650 |
+| 40 | 0.405 | 0.428 | 0.720 |
+
+The true zeros are *already saturated* at this height, far below the GUE log-law,
+and the loop tracks them to ~0.03 (if anything a hair *less* rigid — the 5% jitter
+adds variance, it doesn't remove it). This is **Berry's semiclassical saturation**:
+at finite $T$ the number variance follows universal GUE only up to $L_{\max}(T)$,
+then saturates at a value fixed by the **short** primes (the long periodic orbits).
+The loop has those primes, so it reproduces the saturation. No missing mechanism,
+no artefact — the same explicit formula, weighted by scale: large primes (band
+edge) set the short-range correlations, small primes set the long-range saturation,
+and the loop holds both within its feasible heights.
 
 ## Verdict
 
-The zeta-free shadow carries the operator's *local* spectral fingerprint
-faithfully and **distorts** its *long-range* one (too rigid, and misleadingly so —
-one would be deceived trusting the loop's zeros for $\Sigma^2$/$\Delta_3$). So for
-Hilbert–Pólya the quality buys a clean, circularity-free **lens** on the duality
-and its selection-rigidity, and a measuring instrument for *which* textures the
-prime-only data determine (answer: short-range yes, long-range no). It does not
-buy leverage on positivity or construction, where the program is actually
-blocked. Lens, not lever — now with the boundary measured rather than guessed.
+The zeta-free shadow carries the operator's spectral fingerprint **faithfully on
+both scales** within the loop's feasible range — local GUE *and* the prime-governed
+long-range (Berry-saturated) rigidity, matched to the true zeros. The
+*orbit-dependent* part (the saturation value / $L_{\max}$, fixed by the actual
+primes) is the genuinely caster-adjacent texture, and it survives the band-
+saturation floor. What would eventually drift at asymptotically high $T$ — where
+$L_{\max}$ outgrows the fixed band — is the long-range *statistical* fidelity, but
+that is a harmless divergence in a collective statistic, not a per-zero breakdown
+(detection is local; the per-zero error is height-independent in gap-units), and it
+lies beyond any feasible climb. So for Hilbert–Pólya the quality is a clean,
+circularity-free **lens** that faithfully shows the arithmetic spectral structure —
+not a **lever** on positivity or construction, where the program is blocked.
 
-*Methodological note: the GUE "wash-out" claim above was an educated guess stated
-without data; the spacing histogram refuted it within the hour, and the
-over-rigidity it surfaced is the real result. Look, don't guess.*
+*Methodological note: this section was wrong twice before it was right. "GUE will
+wash out" (guess) was refuted by the spacing histogram; "long-range is an artefact"
+(guess) was refuted by the same-block comparison to `ZetaZero`. Both corrections
+came from looking. Look, don't guess — it's the throughline of this whole project.*
