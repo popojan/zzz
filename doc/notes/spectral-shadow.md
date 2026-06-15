@@ -117,6 +117,24 @@ GUE level repulsion** — the cleanest statement of band-saturation found: the s
 that bounds individual-zero resolution is the wall at which the spectral *texture*
 switches on. (Long range carries no such transition; it is small-prime / height set.)
 
+**The transition is universal in $\kappa$ (`doc/ghy/loop-collapse.py`).** Repeating the
+band sweep at four heights ($\gamma\sim5{,}400$ to $88{,}000$, $X$ from 9 to 9{,}127 —
+$16\times$ in height, $1000\times$ in band) and plotting $P(s<0.5)$ against
+$\kappa=\mathrm{gap}\cdot\log X$, the curves **collapse onto a single curve**:
+
+| $\kappa$ | 2.0 | 2.8 | $\pi$ | 3.5 | 4.0 | 4.5 | 5.0 |
+|---|---|---|---|---|---|---|---|
+| $P(s<0.5)$ (all heights) | 0.00 | .005–.010 | .012–.023 | .035–.042 | .078–.097 | .119–.141 | .147–.162 |
+
+A crystalline floor ($P\to0$) below $\kappa\approx2.5$, a sigmoidal rise *through*
+$\kappa=\pi$, GUE-crossing near $\kappa\approx4.3$, saturating just above GUE (method-B
+jitter). The spread at fixed $\kappa$ is ~10–20% across all heights. So $\kappa$ is *the*
+control parameter, $X=\sqrt{T/2\pi}$ is a **scaling law** (critical $\kappa$
+height-independent), and the wall's three faces — information, spectral, cost — are one
+**universal crossover** in $\kappa$, reconstructed from primes alone. This is the
+cleanest statement of band-saturation the project produced: not "a threshold exists"
+but "a universal critical crossover in $\kappa$, at $\kappa=\pi$."
+
 ## Verdict
 
 The zeta-free shadow carries the operator's spectral fingerprint **faithfully on
