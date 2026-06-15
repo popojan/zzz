@@ -179,24 +179,23 @@ static long backward(state *st, long x_start, long Xcap) {
     return Xk;
 }
 
-// fit-free variant: local-contrast (CFAR) detection, no envelope/Li
+// fit-free variant: local-contrast (CFAR) detection, no envelope/Li.
+// psi' is evaluated lazily over the local window only, so cost tracks the scan
+// length (which stops at the reach), not the full [x_start, Xcap] span.
 static long backward_contrast(state *st, long x_start, long Xcap) {
     long n = st->nz, Xk = x_start - 1;
     const int W = 6;
-    long plo = x_start - W; if (plo < 2) plo = 2;
-    double *pv = malloc((Xcap + 1) * sizeof(double));
-    for (long x = plo; x <= Xcap; ++x) pv[x] = psi_prime((double)x, st->z, n);
-    double buf[64], tmp[64];
+    double buf[2 * W + 2], tmp[2 * W + 2];
     for (long x = x_start; x <= Xcap; ++x) {
         int m = 0;
         for (long j = x - W; j <= x + W; ++j)
-            if (j >= 2 && j <= Xcap && j != x) buf[m++] = pv[j];
+            if (j >= 2 && j != x) buf[m++] = psi_prime((double)j, st->z, n);
         if (m < 3) { Xk = x; continue; }
         memcpy(tmp, buf, m * sizeof(double));
         double base = median_d(tmp, m);
         for (int i = 0; i < m; ++i) tmp[i] = fabs(buf[i] - base);
         double mad = median_d(tmp, m);
-        double c = (pv[x] - base) / (mad + 1e-9);
+        double c = (psi_prime((double)x, st->z, n) - base) / (mad + 1e-9);
         int kp = is_known_pow(x, st);
         if (c > CHI) {
             if (!kp && !p_has(st, x)) { p_push(st, x); printf("%ld\n", x); fflush(stdout); }
@@ -207,7 +206,6 @@ static long backward_contrast(state *st, long x_start, long Xcap) {
             Xk = x;
         }
     }
-    free(pv);
     return Xk;
 }
 
@@ -265,7 +263,7 @@ void loop_opts_default(loop_opts *o) {
     o->state_path = "zzz-loop.state";
     o->resume = 0;
     o->max_iters = 0;
-    o->nmax_zeros = 200000;
+    o->nmax_zeros = 2000000;
     o->kmin = 5.0;
     o->kmin_set = 0;
     o->kmin_floor = 3.5;
@@ -316,9 +314,11 @@ int loop_run(const loop_opts *o) {
     while (!g_stop && (o->max_iters == 0 || st.iter < o->max_iters)) {
         st.iter++;
         // re-detect from just below the known frontier (lower primes already found),
-        // so frequent re-detection stays cheap with small forward batches
-        long Xcap = (long)(1.4 * st.nz); if (Xcap > 2000) Xcap = 2000;
+        // so frequent re-detection stays cheap with small forward batches; Xcap is a
+        // generous margin past the frontier (the scan stops at the reach anyway, and a
+        // shortfall just gets caught up in the next iteration as the frontier grows)
         long x0 = st.Xknown - 16; if (x0 < 2) x0 = 2;
+        long Xcap = st.Xknown + 1024;
         long Xnew = o->contrast ? backward_contrast(&st, x0, Xcap)   // streams new primes
                                 : backward(&st, x0, Xcap);
         if (Xnew > st.Xknown) st.Xknown = Xnew;
@@ -330,11 +330,11 @@ int loop_run(const loop_opts *o) {
         for (long k = st.nz + 1; k <= target && !g_stop; ++k)
             z_push(&st, locate_march(k, &st, st.Xknown, st.z[st.nz - 1]));
 
-        if (o->verbose || st.Xknown != prev_X)
+        if (o->verbose || st.Xknown != prev_X || st.iter % 16 == 0)  // +heartbeat
             fprintf(stderr, "loop: iter %ld  X_known=%ld  primes=%ld  zeros=%ld  kmin=%.3f\n",
                     st.iter, st.Xknown, st.np, st.nz, st.kmin);
 
-        save_state(&st, o->state_path);
+        if (st.iter % 8 == 0) save_state(&st, o->state_path);   // throttle the O(nz) rewrite
 
         if (st.Xknown > best_X) best_X = st.Xknown;
         if (st.Xknown > prev_X) {                          // progress: reach grew
@@ -361,10 +361,8 @@ int loop_run(const loop_opts *o) {
         }
     }
 
-    if (g_stop) {
-        fprintf(stderr, "loop: interrupted; checkpointing to %s\n", o->state_path);
-        save_state(&st, o->state_path);
-    }
+    if (g_stop) fprintf(stderr, "loop: interrupted; checkpointing to %s\n", o->state_path);
+    save_state(&st, o->state_path);                    // always persist the final state
     fprintf(stderr, "loop: done. primes=%ld (largest %ld)  zeros=%ld  state=%s\n",
             st.np, st.np ? st.p[st.np - 1] : 0, st.nz, o->state_path);
 

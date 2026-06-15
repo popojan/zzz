@@ -1191,7 +1191,7 @@ static struct argp_option options[] = {
         { "loop",  'L', 0, 0, "self-paving zeros<->primes bootstrap (zeta-free, primality-free): derive primes from zeros and zeros from primes, alternating; streams primes to stdout, checkpoints for --resume (see doc/notes/zeros-primes-bootstrap.md)"},
         { "resume", 1001, 0, 0, "--loop: resume from the checkpoint file instead of the seed"},
         { "loop-state", 1002, "FILE", 0, "--loop: checkpoint path [zzz-loop.state]"},
-        { "loop-nmax", 1003, "N", 0, "--loop: zero-list cap [200000]"},
+        { "loop-nmax", 1003, "N", 0, "--loop: zero-list cap [2000000]"},
         { "loop-kmin", 1004, "K", 0, "--loop: starting kappa margin for the forward step [5.0]"},
         { "loop-kmin-floor", 1005, "K", 0, "--loop: anneal stops at this margin [3.5]"},
         { "loop-no-anneal", 1006, 0, 0, "--loop: keep kappa fixed (stall at one ceiling) instead of auto-annealing"},
