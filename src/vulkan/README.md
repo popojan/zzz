@@ -91,3 +91,29 @@ make zvk
 - **Feasibility, not precision, is the wall:** `X` is capped by what you can fold
   and upload; at huge height that's far below `√(T/2π)`, so you get gap-scale — by
   design, not by defect.
+
+---
+
+# `loopvk` — the self-paving loop, both directions on the GPU
+
+A Vulkan port of `zzz --loop` (`src/loop.c`): from a 40-zero seed it runs the
+closed primes⇄zeros loop with **both** heavy sums on the GPU — forward
+(primes→zeros) reuses `zeromb.comp` (method B), backward (zeros→primes) is
+`psi.comp` (the Chebyshev ψ′ detector, a reduction over the zeros). No ζ, no
+primality test in the loop body; pure fp64 (modest heights), so it's FLINT-free.
+
+```
+loopvk [maxX] [kmin] [statefile] [kmin_floor]      # default: 500 4.0 zzz-loop.state 3.5
+```
+
+**Feature parity with `zzz --loop`:**
+- **Checkpoint / auto-resume / Ctrl+C** to the **same `zzz-loop.state` format** as
+  `loop.c` — so CPU and GPU runs are **interoperable**: a CPU `./zzz --loop` resumes
+  a `loopvk` checkpoint and vice versa (verified).
+- **Auto-anneal**: on stall, `kmin ×= 0.9` down to `kmin_floor` — verified to ceiling
+  at X*=104 (kmin=5), anneal to 4.5, and climb to 313, all `false_pos=0 missed=0`.
+
+Same honest scope as `zzz --loop`: a *demonstration* (gap-scale, super-critical for a
+finite stretch, sieve still wins) — but now with both directions parallelised on
+consumer hardware. The binary is **primality-test-free**: verify a checkpoint
+*externally*, exactly like the CPU loop — `python3 doc/ghy/check-loop.py <state>`.

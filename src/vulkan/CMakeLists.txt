@@ -34,3 +34,19 @@ add_dependencies(zvk zvk_shader)
 set_target_properties(zvk PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_compile_definitions(zvk PRIVATE ZVK_SPV="${SPV}")
 target_link_libraries(zvk PRIVATE kompute Vulkan::Vulkan flint gmp mpfr m)
+
+# ---- loopvk: the self-paving --loop demo, both directions on the GPU --------
+# Pure fp64 (modest heights) -> FLINT-free; reuses zeromb.comp (forward) + psi.comp (backward).
+set(PSISPV ${CMAKE_CURRENT_BINARY_DIR}/psi.comp.spv)
+add_custom_command(
+    OUTPUT  ${PSISPV}
+    COMMAND ${GLSLANG} -V ${CMAKE_CURRENT_SOURCE_DIR}/psi.comp -o ${PSISPV}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/psi.comp
+    COMMENT "glslang: psi.comp -> SPIR-V")
+add_custom_target(loopvk_shaders DEPENDS ${SPV} ${PSISPV})
+
+add_executable(loopvk loopvk.cpp)
+add_dependencies(loopvk loopvk_shaders)
+set_target_properties(loopvk PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(loopvk PRIVATE ZEROMB_SPV="${SPV}" PSI_SPV="${PSISPV}")
+target_link_libraries(loopvk PRIVATE kompute Vulkan::Vulkan m)

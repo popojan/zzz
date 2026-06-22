@@ -1,0 +1,62 @@
+#version 450
+// psi.comp -- backward step of the loop (zeros -> primes), on the GPU.
+//
+// One workgroup per candidate integer x; the 256 threads cooperatively reduce
+// the Chebyshev psi' signal over the current zeros:
+//   psi'(x) = 1 + 1/(x - x^3) - (4/sqrt x) sum_k cos(gamma_k log x)
+// and return r(x) = psi'(x) / env(x),  env(x) = envc * log(x) / x  (matched-filter
+// peak scale, envc = (20/4) Li(NZ-4)).  r > tau flags a prime power; the host
+// does the threshold + integer bookkeeping (loop.c's backward()).  df32 sum,
+// range-reduced cos -- same hygiene as zeromb.comp.
+
+layout(local_size_x = 256) in;
+const uint WG = 256u;
+
+layout(std430, binding = 0) readonly  buffer Zr  { float z[]; };   // gamma_k (zero ordinates)
+layout(std430, binding = 1) writeonly buffer Out { float r[]; };   // r(x) per candidate
+
+layout(push_constant) uniform PC {
+    uint  NZ;      // number of zeros
+    uint  X0;      // first candidate integer
+    uint  NX;      // number of candidates
+    float envc;    // (20/4) Li(NZ-4)
+} pc;
+
+const float TWO_PI     = 6.283185307179586477;
+const float INV_TWO_PI = 0.159154943091895336;
+
+shared vec2 red[WG];
+shared float rval;
+
+vec2 twoSum(float a, float b) { float s = a + b; float zz = s - a; return vec2(s, (a - (s - zz)) + (b - zz)); }
+vec2 dfAdd(vec2 a, float c)   { vec2 s = twoSum(a.x, c);   return twoSum(s.x, s.y + a.y); }
+vec2 dfAddDf(vec2 a, vec2 b)  { vec2 s = twoSum(a.x, b.x); return twoSum(s.x, s.y + a.y + b.y); }
+
+void main() {
+    uint g = gl_WorkGroupID.x;
+    if (g >= pc.NX) return;
+    uint lid = gl_LocalInvocationID.x;
+    float x  = float(pc.X0 + g);
+    float lx = log(x);
+
+    vec2 S = vec2(0.0, 0.0);                          // sum_k cos(gamma_k log x)
+    for (uint k = lid; k < pc.NZ; k += WG) {
+        float a = z[k] * lx;
+        a -= TWO_PI * floor(a * INV_TWO_PI);
+        S = dfAdd(S, cos(a));
+    }
+    red[lid] = S;
+    barrier();
+    for (uint s = WG / 2u; s > 0u; s >>= 1) {
+        if (lid < s) red[lid] = dfAddDf(red[lid], red[lid + s]);
+        barrier();
+    }
+    if (lid == 0u) {
+        float Ssum = red[0].x + red[0].y;
+        float psip = 1.0 + 1.0 / (x - x * x * x) - (4.0 / sqrt(x)) * Ssum;
+        float env  = pc.envc * lx / x;
+        rval = psip / env;
+    }
+    barrier();
+    if (lid == 0u) r[g] = rval;
+}
