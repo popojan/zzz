@@ -139,12 +139,21 @@ essentially optimal:
 
 ## What could still change the picture (precisely bounded)
 
-- **Sub-floor rigidity.** Today's indistinguishability is bounded at the
-  $5\times10^{-6}$ data floor (far zone held at B seeds, machine
-  arithmetic). The zero measure is a *unit-mass point process*, not a
-  continuum; quantization/positivity rigidity could in principle break the
-  degeneracy at some far smaller scale. Five independent negatives weigh
-  against it; nothing today tests below the floor.
+- **Sub-floor rigidity — now tested directly, NEGATIVE with a mechanism**
+  ([`zero-rigidity.md`](zero-rigidity.md), 2026-06-21). The zero measure is a
+  *unit-mass point process*; could its rigidity (not the primes) select the true
+  configuration? The five prior negatives all used prime data or continuous $L^2$
+  fits (provably null), so they could not see it. Tested at oracle strength: the
+  zeros self-determine to $0.0096$ gap from 64 true neighbours (real Ghosh–Peres
+  rigidity), and the optimal denoiser removes 33–92% of a *smooth* displacement —
+  but only **2–3% of the real below-threshold B error**, because $d_B=\arg
+  P_X/\pi-S$ is the **high-frequency tail of $S$** (primes $>X$), orthogonal to
+  the smooth/long-range structure rigidity pins. The correction rises *through*
+  $\kappa=\pi$ (2–3% below, 6–10% above), reproducing this very wall. Rigidity
+  nails the part B already gets right and is blind to the part B gets wrong. Only
+  hedge: linear (Gaussian-optimal for $S$) denoiser; a nonlinear determinantal
+  estimator is untested but implausible to help. The wall stands against primes
+  **and** primes-plus-zero-rigidity.
 - **Above-threshold constants.** ~~Untested~~ — **tested same day (E5),
   and it pays.** `e5-above-threshold.wls` + `.log`: the exact-identity fit
   at $10^{12}{+}5000$, window ±12 (94 unknowns), far zone ±20 at B seeds,
