@@ -1,74 +1,81 @@
 #version 450
 // zeromb.comp -- batch method-B zero refinement, window-relative, df32.
 //
-// One thread per zero in a window anchored at t_base (the ARB-computed Lambert-W
-// location).  The host folds the huge base phases (m*log p*t_base) mod 2*pi in
-// ARB once per window; here we only ever touch O(1) quantities:
-//   phi[k] in [0,2pi),  amp[k]=1/(m p^{m/2}),  om[k]=m log p,  delta ~ gap.
-// F_B(t_base+delta) = N0(t_base+delta) + (1/pi) Im log P_X, with
-//   Im log P_X = -sum_k amp[k] sin(phi[k] + om[k]*delta).
-// We bisect F_B - (integer target) in delta; t_n = t_base + delta (added in ARB).
+// Axis A x B: ONE WORKGROUP PER ZERO; the workgroup's threads cooperatively
+// reduce the O(P) prime sum (so a single zero with large -k gets real GPU
+// parallelism, not one serial lane).  The root-find is the same verified
+// bisection as the baseline -- driven identically by every thread off the
+// shared reduction result, so the answer matches the thread-per-zero kernel.
 //
-// Robustness (verified against mpmath to ~1e-6 at moderate X; large-X needs both):
-//   * the sin argument phi+om*delta is RANGE-REDUCED mod 2pi -- GPU sin loses
-//     accuracy past ~2pi (Intel Mesa included), which otherwise corrupts the sum
-//     once high-omega primes enter (large X);
-//   * the prime sum uses a df32 (two-float / TwoSum) accumulator, so ~1e5 terms
-//     accumulate without fp32 drift.
+// F_B(t_base+d) = N0(t_base+d) + (1/pi) Im log P_X,
+//   Im log P_X = -sum_k amp[k] sin(phi[k] + om[k]*d).
+// Host folds (m log p . t_base) mod 2pi in ARB; here phi in [0,2pi), om=m log p,
+// amp=1/(m p^{m/2}), d~gap.  sin arg range-reduced; sum in df32 (two-float).
 
-layout(local_size_x = 64) in;
+layout(local_size_x = 256) in;
+const uint WG = 256u;
 
-layout(std430, binding = 0) readonly  buffer Phi { float phi[]; };  // (m log p . t_base) mod 2pi
-layout(std430, binding = 1) readonly  buffer Amp { float amp[]; };  // 1/(m p^{m/2})
-layout(std430, binding = 2) readonly  buffer Om  { float om[];  };  // m log p
+layout(std430, binding = 0) readonly  buffer Phi { float phi[]; };
+layout(std430, binding = 1) readonly  buffer Amp { float amp[]; };
+layout(std430, binding = 2) readonly  buffer Om  { float om[];  };
 layout(std430, binding = 3) writeonly buffer Out { float delta[]; };
 
 layout(push_constant) uniform PC {
-    uint  P;     // number of prime-powers
-    uint  M;     // number of zeros in the window
-    int   Wc;    // centre index (so integer offset dn = thread - Wc)
-    float rho;   // N0'(t_base) = local zero density
-    float rho1;  // N0''(t_base) (curvature; ~0 at large height)
-    float c0;    // N0(t_base) - (n_centre - 1/2)   [ARB residual, O(1)]
-    float gap;   // 1 / rho
+    uint  P;     uint  M;     int   Wc;
+    float rho;   float rho1;  float c0;   float gap;
 } pc;
 
 const float INV_PI     = 0.318309886183790672;
 const float TWO_PI     = 6.283185307179586477;
 const float INV_TWO_PI = 0.159154943091895336;
 
-// TwoSum: hi+lo = a+b exactly (Knuth).
-vec2 twoSum(float a, float b) { float s = a + b; float z = s - a; return vec2(s, (a - (s - z)) + (b - z)); }
+shared vec2  red[WG];   // df32 partials
+shared float gval;      // broadcast F_B(d)
 
-// F_B(t_base + d) - target(dn), all O(1).  Range-reduced sin + df32 reduction.
-float g(float d, int dn) {
-    float sm = pc.c0 + pc.rho * d + 0.5 * pc.rho1 * d * d - float(dn);  // N0 - target
-    vec2 S = vec2(0.0, 0.0);                          // df32 accumulator of sum_k amp sin
-    for (uint k = 0u; k < pc.P; ++k) {
+vec2 twoSum(float a, float b) { float s = a + b; float z = s - a; return vec2(s, (a - (s - z)) + (b - z)); }
+vec2 dfAdd(vec2 a, float c)   { vec2 s = twoSum(a.x, c);     return twoSum(s.x, s.y + a.y); }       // df32 + float
+vec2 dfAddDf(vec2 a, vec2 b)  { vec2 s = twoSum(a.x, b.x);   return twoSum(s.x, s.y + a.y + b.y); }  // df32 + df32
+
+// cooperative F_B(t_base + d) - target(dn); every thread returns the same value.
+float gcoop(float d, int dn, uint lid) {
+    vec2 S = vec2(0.0, 0.0);
+    for (uint k = lid; k < pc.P; k += WG) {           // strided slice of primes
         float a = phi[k] + om[k] * d;
-        a -= TWO_PI * floor(a * INV_TWO_PI);          // reduce to [0,2pi) for sin accuracy
-        float term = amp[k] * sin(a);
-        vec2 t1 = twoSum(S.x, term);                  // df32 add
-        S = twoSum(t1.x, t1.y + S.y);
+        a -= TWO_PI * floor(a * INV_TWO_PI);
+        S = dfAdd(S, amp[k] * sin(a));
     }
-    return sm - INV_PI * (S.x + S.y);                 // F_B = N0 + Im log P_X / pi
+    red[lid] = S;
+    barrier();
+    for (uint s = WG / 2u; s > 0u; s >>= 1) {          // df32 tree reduction
+        if (lid < s) red[lid] = dfAddDf(red[lid], red[lid + s]);
+        barrier();
+    }
+    if (lid == 0u) {
+        float sm = pc.c0 + pc.rho * d + 0.5 * pc.rho1 * d * d - float(dn);
+        gval = sm - INV_PI * (red[0].x + red[0].y);
+    }
+    barrier();
+    return gval;
 }
 
 void main() {
-    uint i = gl_GlobalInvocationID.x;
+    uint i = gl_WorkGroupID.x;        // one workgroup per zero (uniform across the WG)
     if (i >= pc.M) return;
-    int   dn = int(i) - pc.Wc;          // integer offset of this zero from centre
-    float d0 = float(dn) * pc.gap;      // smooth-seeded prediction (independent!)
+    uint lid = gl_LocalInvocationID.x;
+    int  dn  = int(i) - pc.Wc;
+    float d0 = float(dn) * pc.gap;
     float lo = d0 - 0.9 * pc.gap, hi = d0 + 0.9 * pc.gap;
-    float glo = g(lo, dn), ghi = g(hi, dn);
-    if ((glo > 0.0) == (ghi > 0.0)) {   // widen once if the bracket missed
+    float glo = gcoop(lo, dn, lid);
+    float ghi = gcoop(hi, dn, lid);
+    if ((glo > 0.0) == (ghi > 0.0)) {                  // widen once
         lo = d0 - 1.8 * pc.gap; hi = d0 + 1.8 * pc.gap;
-        glo = g(lo, dn); ghi = g(hi, dn);
+        glo = gcoop(lo, dn, lid); ghi = gcoop(hi, dn, lid);
     }
-    if ((glo > 0.0) == (ghi > 0.0)) { delta[i] = d0; return; }  // fallback: predicted
-    for (int it = 0; it < 40; ++it) {   // lockstep bisection
-        float mid = 0.5 * (lo + hi), gm = g(mid, dn);
+    if ((glo > 0.0) == (ghi > 0.0)) { if (lid == 0u) delta[i] = d0; return; }  // fallback (uniform)
+    for (int it = 0; it < 40; ++it) {                  // bisection (every thread, identical)
+        float mid = 0.5 * (lo + hi);
+        float gm  = gcoop(mid, dn, lid);
         if ((glo > 0.0) == (gm > 0.0)) { lo = mid; glo = gm; } else { hi = mid; }
     }
-    delta[i] = 0.5 * (lo + hi);
+    if (lid == 0u) delta[i] = 0.5 * (lo + hi);
 }

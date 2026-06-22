@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
     auto tOut = mgr.tensor(std::vector<float>((size_t)count, 0.0f));
     auto algo = mgr.algorithm<float, PC>(
         { tPhi, tAmp, tOm, tOut }, spirv,
-        kp::Workgroup({ (uint32_t)((count + 63) / 64), 1, 1 }),
+        kp::Workgroup({ (uint32_t)count, 1, 1 }),   // one workgroup (256 threads) per zero
         std::vector<float>{}, std::vector<PC>{ pc });
     mgr.sequence()
         ->record<kp::OpTensorSyncDevice>({ tPhi, tAmp, tOm })

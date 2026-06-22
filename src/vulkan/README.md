@@ -53,16 +53,19 @@ make zvk
   at zeros #1000 / #1032 (X = p_K), and Odlyzko to gap-scale. So `zeromb.comp` is
   faithful method B. (Note for users: `./zzz --ghy` needs `-k` to set the prime
   count; without it X=0 and it returns N₀-only.)
-- **Architecture = one thread per zero (Axis A).** Correct for a *window* of
-  zeros (the threads parallelise across them). Two known, non-bug limits: a
-  single window holds only ~tens of zeros (the `c0+ρδ+½ρ'δ²` Taylor anchor is
-  small-δ); and `count=1` at very large X (P≳5×10⁴) underuses the GPU — one
-  thread does the whole O(P) sum, the bisection bracket then falls back to
-  `t_base` (≠ a precision error). **Planned rewrite:** workgroup-per-zero +
-  intra-workgroup df32 prime-reduction (Axis B) + parallel δ-grid evaluation
-  (Axis C, replaces sequential bisection — Newton is avoided, `F_B` is
-  oscillatory). That gives a real single-zero / high-`-k` speedup and saturates
-  the GPU for blocks at height.
+- **Architecture = one workgroup per zero, cooperative df32 prime-reduction
+  (Axis A × B).** Each zero gets a 256-thread workgroup; the threads reduce the
+  O(P) prime sum together (so a *single* high-`-k` zero is parallel, not one
+  serial lane), and the verified bisection drives off the shared reduction
+  result (so the answer is bit-identical to the thread-per-zero baseline).
+  Confirmed: a single zero at X=10⁶ (P≈79k) now computes (≈1419.415, near true)
+  where the thread-per-zero kernel fell back to `t_base`.
+- **Remaining limit (not a bug): single Taylor anchor ⇒ window ≈ tens of zeros.**
+  `c0+ρδ+½ρ'δ²` is small-δ, so `count`≳~64 makes the *edge* zeros drift (one
+  `t_base` can't cover the span). Big blocks need **window tiling** (host splits
+  `count` into sub-windows, each its own ARB anchor) — pending. Until then keep
+  `count` to a few dozen. **Axis C** (parallel δ-grid replacing bisection; Newton
+  avoided since `F_B` is oscillatory) is an optional later depth-reduction.
 - **Precision:** the sum uses a **df32 (two-float) accumulator** with a
   **range-reduced `sin` argument** (mod 2π — GPU `sin` degrades past ~2π). These
   are defensive; at moderate X plain fp32+Kahan already matched mpmath to 1e-6.
