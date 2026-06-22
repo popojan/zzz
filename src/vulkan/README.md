@@ -60,12 +60,17 @@ make zvk
   result (so the answer is bit-identical to the thread-per-zero baseline).
   Confirmed: a single zero at X=10⁶ (P≈79k) now computes (≈1419.415, near true)
   where the thread-per-zero kernel fell back to `t_base`.
-- **Remaining limit (not a bug): single Taylor anchor ⇒ window ≈ tens of zeros.**
-  `c0+ρδ+½ρ'δ²` is small-δ, so `count`≳~64 makes the *edge* zeros drift (one
-  `t_base` can't cover the span). Big blocks need **window tiling** (host splits
-  `count` into sub-windows, each its own ARB anchor) — pending. Until then keep
-  `count` to a few dozen. **Axis C** (parallel δ-grid replacing bisection; Newton
-  avoided since `F_B` is oscillatory) is an optional later depth-reduction.
+- **Window tiling (done):** a single Taylor anchor `c0+ρδ+½ρ'δ²` is only small-δ
+  valid, so a block of `count` zeros is split into sub-windows of `W` zeros
+  (default 32; `zvk <n0> <count> [X] [W]`), each with its **own** ARB anchor +
+  folded phases (`amp`/`om` are anchor-independent, folded once). Verified: at
+  `count=256` the edge zeros match the single-zero path to ~1e-5 (vs ~0.01 drift
+  with one anchor). `amp`/`om` tensors are persistent; only `φ` is re-folded and
+  re-uploaded per sub-window.
+- **Axis C (optional, not done):** a parallel δ-grid evaluation replacing the
+  sequential bisection (Newton avoided — `F_B` is oscillatory) would shorten the
+  critical path; worth it only once the ~0.5 s fixed Vulkan/kompute+ARB init is
+  amortised over large blocks, which profiling can decide.
 - **Precision:** the sum uses a **df32 (two-float) accumulator** with a
   **range-reduced `sin` argument** (mod 2π — GPU `sin` degrades past ~2π). These
   are defensive; at moderate X plain fp32+Kahan already matched mpmath to 1e-6.

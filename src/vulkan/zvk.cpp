@@ -1,26 +1,22 @@
 // zvk.cpp -- Vulkan-accelerated batch method-B zero computer (experimental).
 //
-//   zvk <n0> <count> [X]
+//   zvk <n0> <count> [X] [W]
 //
-// Computes the ordinates of zeros #n0 .. #n0+count-1 in the original-zzz spirit
-// (method B / GHY P_X), split across CPU and GPU exactly where precision demands:
+// Computes ordinates of zeros #n0 .. #n0+count-1 in the original-zzz spirit
+// (method B / GHY P_X), CPU/GPU split where precision demands it:
 //
-//   ARB (CPU), once per window:
-//     * t_base   = Lambert-W asymptotic location of the block-centre zero,
-//                  to full precision (a number of ~log10(n0) digits);
-//     * fold the huge base phases  phi[k] = (m log p . t_base) mod 2pi  for every
-//       prime power p^m <= X  (this is what genuinely needs ARB -- the fractional
-//       part of a ~10^D-scale product);
-//     * c0 = N0(t_base) - (n_centre - 1/2),  rho = N0',  rho1 = N0''   (all O(1)).
-//   GPU (df32, Vulkan via kompute):
-//     * one thread per zero bisects F_B(t_base+delta) in the small offset delta,
-//       reusing the folded phases.  Returns delta[i]; the host adds t_base+delta
-//       in ARB so the output carries t_base's leading digits + the gap-scale
-//       refinement the primes determine (exactly the band-saturation structure).
+//   ARB (CPU): per sub-window of <=W zeros, the Lambert-W anchor t_base and the
+//     folded base phases phi[k] = (m log p . t_base) mod 2pi for every p^m <= X
+//     (the part that genuinely needs ARB).  amp=1/(m p^{m/2}) and om=m log p are
+//     t_base-independent -> folded ONCE for the whole block.
+//   GPU (kompute, df32): one workgroup per zero cooperatively reduces the O(P)
+//     prime sum and bisects F_B(t_base+delta) in the small offset (zeromb.comp).
 //
-// This is a constant-factor accelerator of method B at gap-scale accuracy; it is
-// NOT a substitute for --boot/--weil (those stay CPU/ARB for sub-gap precision).
-// See src/vulkan/README.md.  UNTESTED in this tree (needs Vulkan+glslang+kompute).
+// Tiling: a single Taylor anchor (c0+rho*d+rho1*d^2/2) is valid only for small
+// delta, so the block is split into sub-windows of <=W zeros, each its own
+// anchor + folded phases; the edge zeros stay accurate.  Output = t_base+delta
+// in ARB (leading digits from the smooth anchor, gap-scale refinement from
+// primes -- the band-saturation structure).  See src/vulkan/README.md.
 
 #include <flint/arb.h>
 #include <flint/acb.h>
@@ -56,129 +52,135 @@ static std::vector<uint32_t> load_spv(const char *path) {
 
 int main(int argc, char **argv) {
     if (argc < 3) {
-        fprintf(stderr, "usage: %s <n0> <count> [X]\n", argv[0]);
+        fprintf(stderr, "usage: %s <n0> <count> [X] [W]\n", argv[0]);
         return 2;
     }
     const char *n0_str = argv[1];
     long  count = strtol(argv[2], nullptr, 10);
     ulong X     = (argc > 3) ? strtoul(argv[3], nullptr, 10) : 100003UL;
-    if (count <= 0) { fprintf(stderr, "zvk: count must be > 0\n"); return 2; }
+    long  W     = (argc > 4) ? strtol(argv[4], nullptr, 10) : 32;   // zeros per sub-window
+    if (count <= 0 || W <= 0) { fprintf(stderr, "zvk: count, W must be > 0\n"); return 2; }
 
-    // working precision: enough that the folded phase is good to ~fp32 abs.
-    slong D = (slong)strlen(n0_str);
+    slong D    = (slong)strlen(n0_str);
     slong PREC = 256 + (slong)(D * 3.34) + 128;
 
-    arb_t nc, tbase, arg, w, twopi, pi, lp, phase, tmp, theta, c0a, rhoa, t_lo;
+    arb_t pi, twopi, tmp, aa, lp, tbase, nc, arg, w, tlo, theta, c0a, rhoa;
     acb_t z, lg;
-    arb_init(nc); arb_init(tbase); arb_init(arg); arb_init(w);
-    arb_init(twopi); arb_init(pi); arb_init(lp); arb_init(phase);
-    arb_init(tmp); arb_init(theta); arb_init(c0a); arb_init(rhoa); arb_init(t_lo);
+    arb_init(pi); arb_init(twopi); arb_init(tmp); arb_init(aa); arb_init(lp);
+    arb_init(tbase); arb_init(nc); arb_init(arg); arb_init(w); arb_init(tlo);
+    arb_init(theta); arb_init(c0a); arb_init(rhoa);
     acb_init(z); acb_init(lg);
-
     arb_const_pi(pi, PREC);
-    arb_mul_2exp_si(twopi, pi, 1);                       // 2 pi
+    arb_mul_2exp_si(twopi, pi, 1);
 
-    // n_centre = n0 + count/2
-    if (arb_set_str(nc, n0_str, PREC)) { fprintf(stderr, "zvk: bad n0\n"); return 2; }
-    arb_add_ui(nc, nc, (ulong)(count / 2), PREC);
-
-    // Lambert-W asymptotic:  t_base = 2 pi (nc - 11/8) / W( e^{-1} (nc - 11/8) )
-    arb_set_ui(tmp, 11); arb_div_ui(tmp, tmp, 8, PREC);
-    arb_sub(arg, nc, tmp, PREC);                         // nc - 11/8
-    arb_set_si(tmp, -1); arb_exp(tmp, tmp, PREC);        // e^{-1}
-    arb_mul(w, arg, tmp, PREC);                          // e^{-1}(nc-11/8)
-    arb_lambertw(w, w, 0, PREC);                         // principal branch W_0
-    arb_mul(tbase, twopi, arg, PREC);
-    arb_div(tbase, tbase, w, PREC);                      // t_base
-
-    // theta(t_base) = Im logGamma(1/4 + i t_base/2) - (t_base/2) log pi
-    arb_set_d(tmp, 0.25);
-    arb_mul_2exp_si(t_lo, tbase, -1);                    // t_base/2
-    acb_set_arb_arb(z, tmp, t_lo);
-    acb_lgamma(lg, z, PREC);
-    arb_log(tmp, pi, PREC);
-    arb_mul(tmp, tmp, t_lo, PREC);                       // (t_base/2) log pi
-    arb_sub(theta, acb_imagref(lg), tmp, PREC);
-
-    // c0 = theta/pi - nc + 3/2   (= N0(t_base) - (nc - 1/2))
-    arb_div(c0a, theta, pi, PREC);
-    arb_sub(c0a, c0a, nc, PREC);
-    arb_set_d(tmp, 1.5); arb_add(c0a, c0a, tmp, PREC);
-
-    // rho = (1/2pi) log(t_base/2pi)
-    arb_div(tmp, tbase, twopi, PREC);
-    arb_log(tmp, tmp, PREC);
-    arb_div(rhoa, tmp, twopi, PREC);
-
-    double rho_d  = arf_get_d(arb_midref(rhoa), ARF_RND_NEAR);
-    double tbase_d_log = arf_get_d(arb_midref(tbase), ARF_RND_NEAR);  // only for rho1 ~0
-    PC pc{};
-    pc.M    = (uint32_t)count;
-    pc.Wc   = (int32_t)(count / 2);
-    pc.rho  = (float)rho_d;
-    pc.rho1 = (float)(1.0 / (2.0 * M_PI * tbase_d_log));   // N0'' ~ tiny
-    pc.c0   = (float)arf_get_d(arb_midref(c0a), ARF_RND_NEAR);
-    pc.gap  = (float)(1.0 / rho_d);
-
-    // fold base phases for every prime power p^m <= X
-    std::vector<float> phiD, ampD, omD;
+    // ---- prime powers p^m <= X : amp, om (GPU, static), mlp = m log p (ARB) ----
+    std::vector<float> ampD, omD;
+    std::vector<arb_struct> mlp;
     n_primes_t it; n_primes_init(it);
     ulong p;
     while ((p = n_primes_next(it)) <= X) {
         ulong q = p, m = 1;
+        arb_log_ui(lp, p, PREC);                         // log p, high precision
         for (;;) {
-            arb_log_ui(lp, p, PREC);                     // log p (high precision)
-            arb_mul_ui(phase, lp, m, PREC);
-            arb_mul(phase, phase, tbase, PREC);          // m log p . t_base
-            arb_div(tmp, phase, twopi, PREC);
-            arb_floor(tmp, tmp, PREC);
-            arb_submul(phase, tmp, twopi, PREC);         // mod 2pi  -> [0,2pi)
-            phiD.push_back((float)arf_get_d(arb_midref(phase), ARF_RND_NEAR));
+            arb_struct e; arb_init(&e);
+            arb_mul_ui(&e, lp, m, PREC);                 // m log p  (kept in ARB)
+            mlp.push_back(e);
             ampD.push_back((float)(1.0 / (m * pow((double)p, 0.5 * m))));
             omD.push_back((float)(m * log((double)p)));
-            if (q > X / p) break;                        // next power overflow-safe
+            if (q > X / p) break;
             q *= p; ++m;
         }
     }
     n_primes_clear(it);
-    pc.P = (uint32_t)phiD.size();
-    fprintf(stderr, "zvk: t_base ~ %g, primes<=%lu -> %u prime-powers, window=%ld\n",
-            arf_get_d(arb_midref(tbase), ARF_RND_NEAR), X, pc.P, count);
+    uint32_t P = (uint32_t)ampD.size();
+    fprintf(stderr, "zvk: primes<=%lu -> %u prime-powers; block %ld zeros, W=%ld\n",
+            X, P, count, W);
 
-    // ---- GPU dispatch (kompute) -------------------------------------------
+    // ---- GPU setup (persistent Manager + static amp/om tensors) ----
     std::vector<uint32_t> spirv = load_spv(ZVK_SPV);
     kp::Manager mgr;
-    auto tPhi = mgr.tensor(phiD);
     auto tAmp = mgr.tensor(ampD);
     auto tOm  = mgr.tensor(omD);
-    auto tOut = mgr.tensor(std::vector<float>((size_t)count, 0.0f));
-    auto algo = mgr.algorithm<float, PC>(
-        { tPhi, tAmp, tOm, tOut }, spirv,
-        kp::Workgroup({ (uint32_t)count, 1, 1 }),   // one workgroup (256 threads) per zero
-        std::vector<float>{}, std::vector<PC>{ pc });
-    mgr.sequence()
-        ->record<kp::OpTensorSyncDevice>({ tPhi, tAmp, tOm })
-        ->record<kp::OpAlgoDispatch>(algo)
-        ->record<kp::OpTensorSyncLocal>({ tOut })
-        ->eval();
-    std::vector<float> delta = tOut->vector();
 
-    // ---- output: t_n = t_base + delta (in ARB) ----------------------------
+    std::vector<float> phiD(P);
     slong ndigits = D + 6;
     arb_t tn, dlt;
     arb_init(tn); arb_init(dlt);
-    for (long i = 0; i < count; ++i) {
-        arb_set_d(dlt, (double)delta[(size_t)i]);
-        arb_add(tn, tbase, dlt, PREC);
-        char *s = arb_get_str(tn, ndigits, ARB_STR_NO_RADIUS);
-        printf("%s\n", s);
-        flint_free(s);
-    }
-    arb_clear(tn); arb_clear(dlt);
 
-    arb_clear(nc); arb_clear(tbase); arb_clear(arg); arb_clear(w);
-    arb_clear(twopi); arb_clear(pi); arb_clear(lp); arb_clear(phase);
-    arb_clear(tmp); arb_clear(theta); arb_clear(c0a); arb_clear(rhoa); arb_clear(t_lo);
+    // ---- sub-window loop ----
+    for (long done = 0; done < count; ) {
+        long M = (count - done < W) ? (count - done) : W;
+
+        // n_center = n0 + done + M/2  (sub-window centre)
+        arb_set_str(nc, n0_str, PREC);
+        arb_add_ui(nc, nc, (ulong)(done + M / 2), PREC);
+
+        // Lambert-W anchor: t_base = 2pi (nc-11/8) / W( e^{-1}(nc-11/8) )
+        arb_set_ui(tmp, 11); arb_div_ui(tmp, tmp, 8, PREC);
+        arb_sub(arg, nc, tmp, PREC);
+        arb_set_si(tmp, -1); arb_exp(tmp, tmp, PREC);
+        arb_mul(w, arg, tmp, PREC);
+        arb_lambertw(w, w, 0, PREC);
+        arb_mul(tbase, twopi, arg, PREC);
+        arb_div(tbase, tbase, w, PREC);
+
+        // theta(t_base), c0, rho, rho1
+        arb_set_d(tmp, 0.25);
+        arb_mul_2exp_si(tlo, tbase, -1);
+        acb_set_arb_arb(z, tmp, tlo);
+        acb_lgamma(lg, z, PREC);
+        arb_log(tmp, pi, PREC); arb_mul(tmp, tmp, tlo, PREC);
+        arb_sub(theta, acb_imagref(lg), tmp, PREC);
+        arb_div(c0a, theta, pi, PREC);
+        arb_sub(c0a, c0a, nc, PREC);
+        arb_set_d(tmp, 1.5); arb_add(c0a, c0a, tmp, PREC);     // c0 = N0(t_base)-(nc-1/2)
+        arb_div(tmp, tbase, twopi, PREC); arb_log(tmp, tmp, PREC);
+        arb_div(rhoa, tmp, twopi, PREC);                       // rho = N0'(t_base)
+        double rho_d   = arf_get_d(arb_midref(rhoa), ARF_RND_NEAR);
+        double tbase_d = arf_get_d(arb_midref(tbase), ARF_RND_NEAR);
+
+        // fold phases for this anchor
+        for (uint32_t k = 0; k < P; ++k) {
+            arb_mul(tmp, &mlp[k], tbase, PREC);                // m log p . t_base
+            arb_div(aa, tmp, twopi, PREC); arb_floor(aa, aa, PREC);
+            arb_submul(tmp, aa, twopi, PREC);                  // mod 2pi
+            phiD[k] = (float)arf_get_d(arb_midref(tmp), ARF_RND_NEAR);
+        }
+
+        PC pc{};
+        pc.P = P; pc.M = (uint32_t)M; pc.Wc = (int32_t)(M / 2);
+        pc.rho = (float)rho_d; pc.rho1 = (float)(1.0 / (2.0 * M_PI * tbase_d));
+        pc.c0  = (float)arf_get_d(arb_midref(c0a), ARF_RND_NEAR);
+        pc.gap = (float)(1.0 / rho_d);
+
+        auto tPhi = mgr.tensor(phiD);
+        auto tOut = mgr.tensor(std::vector<float>((size_t)M, 0.0f));
+        auto algo = mgr.algorithm<float, PC>(
+            { tPhi, tAmp, tOm, tOut }, spirv,        // binding order: 0=phi,1=amp,2=om,3=out
+            kp::Workgroup({ (uint32_t)M, 1, 1 }),    // one workgroup (256 threads) per zero
+            std::vector<float>{}, std::vector<PC>{ pc });
+        mgr.sequence()
+            ->record<kp::OpTensorSyncDevice>({ tPhi, tAmp, tOm })
+            ->record<kp::OpAlgoDispatch>(algo)
+            ->record<kp::OpTensorSyncLocal>({ tOut })
+            ->eval();
+        std::vector<float> delta = tOut->vector();
+
+        for (long j = 0; j < M; ++j) {
+            arb_set_d(dlt, (double)delta[(size_t)j]);
+            arb_add(tn, tbase, dlt, PREC);
+            char *s = arb_get_str(tn, ndigits, ARB_STR_NO_RADIUS);
+            printf("%s\n", s);
+            flint_free(s);
+        }
+        done += M;
+    }
+
+    for (uint32_t k = 0; k < P; ++k) arb_clear(&mlp[k]);
+    arb_clear(tn); arb_clear(dlt);
+    arb_clear(pi); arb_clear(twopi); arb_clear(tmp); arb_clear(aa); arb_clear(lp);
+    arb_clear(tbase); arb_clear(nc); arb_clear(arg); arb_clear(w); arb_clear(tlo);
+    arb_clear(theta); arb_clear(c0a); arb_clear(rhoa);
     acb_clear(z); acb_clear(lg);
     return 0;
 }
