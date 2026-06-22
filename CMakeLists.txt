@@ -47,3 +47,9 @@ target_link_libraries(zzz     ghy m)
 target_link_libraries(zghy    ghy m)
 target_link_libraries(zhad    ghy m)
 target_link_libraries(zhybrid ghy m)
+
+# ---- experimental: Vulkan-accelerated batch method-B (opt-in) --------------
+option(BUILD_VULKAN "build the experimental Vulkan batch method-B tool (zvk)" OFF)
+if(BUILD_VULKAN)
+    add_subdirectory(src/vulkan)
+endif()
