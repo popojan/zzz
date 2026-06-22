@@ -45,10 +45,11 @@ float segDist(vec2 p, vec2 a, vec2 b){
 
 void mainImage(out vec4 O, in vec2 F){
     vec2 R=iResolution.xy, uv=F/R;
-    int Xknown=int(texelFetch(iChannel0, idx2(0),0).a+0.5); if(Xknown<3) Xknown=3;
-
-    int pc; float xLo, xHi; primeWindow(iChannel0, iTime, pc, xLo, xHi);   // shared with Buffer B
-    float pcf = float(pc);
+    // window cached by Buffer B (.g=pc, .b=xLo, .a=xHi) — one fetch instead of a
+    // per-pixel primeWindow scan; also makes the markers match the trace exactly.
+    vec4 win = texelFetch(iChannel1, ivec2(0,0), 0);
+    int pc = int(win.g+0.5); float pcf = float(pc);
+    float xLo = win.b, xHi = win.a;
     float x = xLo + (xHi-xLo)*uv.x;                       // this column's number-line position
 
     float baseY=0.10, scaleY=0.46, yThr=baseY+0.30*scaleY;
@@ -73,7 +74,7 @@ void mainImage(out vec4 O, in vec2 F){
     col += vec3(0.25,0.85,1.0)*reveal*(line + 0.22*glow)*band;
 
     int ni=int(floor(x+0.5));
-    if(ni>=2 && ni<=Xknown && isPrimeLive(ni) && float(ni)<=pcf+0.5)
+    if(ni>=2 && float(ni)<=pcf+0.5 && isPrimeLive(ni))   // cheap tests gate the texelFetch
         col += vec3(0.1,0.95,0.35)*reveal*smoothstep(0.6,0.0,abs(x-float(ni)))*0.30;
 
     col += vec3(0.6,1.0,0.75)*smoothstep(1.3,0.0,abs(x-float(pc)))*(0.55+0.45*sin(iTime*9.0));
