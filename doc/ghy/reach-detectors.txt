@@ -1,0 +1,16 @@
+# (progress) reaches computed
+# BACKWARD REACH on the loop's OWN noisy zeros (gamma<=47530.9, tau=0.30).  reach = flawless prefix.
+
+n         Dirichlet      Fejer    Jackson
+750             149        281        225
+1500            464        461        419
+3000            461        827        617
+6000           1694       1543        827
+
+# reach exponent alpha (log reach vs log n, global fit)
+Dirichlet  alpha = 1.051
+Fejer      alpha = 0.821
+Jackson    alpha = 0.619
+
+# alpha > 0.5 => loop super-critical at kappa=pi on its OWN noisy zeros.
+# Best window's alpha vs Dirichlet's = the recoverable backward lever.
