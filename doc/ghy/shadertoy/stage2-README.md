@@ -1,5 +1,7 @@
 # zzz live loop on Shadertoy (Stage 2)
 
+**Live:** https://www.shadertoy.com/view/s3BSzD
+
 Self-paving primes-from-zeros bootstrap running entirely on the GPU. From a
 **40-zero seed** (the only baked-in data) it runs the explicit formula as a
 closed loop — no sieve, no primality test, no ζ evaluation. Transliterated from

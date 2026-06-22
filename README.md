@@ -130,6 +130,10 @@ local-contrast detector (`--loop-contrast`) drops even the empirical $\psi'$
 envelope. Mechanism, the contraction-map ceiling, the detector A/B and the
 seed-count limits: [`doc/notes/zeros-primes-bootstrap.md`](doc/notes/zeros-primes-bootstrap.md).
 
+**Live GPU demo.** The whole loop runs in-shader (fp32, 40-zero seed, no sieve,
+no ζ) on Shadertoy: <https://www.shadertoy.com/view/s3BSzD> — source and setup
+under [`doc/ghy/shadertoy/`](doc/ghy/shadertoy/).
+
 ## Zero counting function approximation
 
 Note: obsolete inner sum approximation, not used any more.

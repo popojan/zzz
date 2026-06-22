@@ -1,4 +1,4 @@
-/*  zzz live loop — IMAGE tab.
+/*  zzz live loop — IMAGE tab.   Published: https://www.shadertoy.com/view/s3BSzD
  *    iChannel0 = Buffer A   (loop state: zeros, prime-indicator, control)
  *    iChannel1 = Buffer B   (per-column trace cache r(x), stored in row 0)
  *  The heavy detector sum now lives in Buffer B; here we just sample it.
