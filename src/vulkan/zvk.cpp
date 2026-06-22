@@ -74,19 +74,22 @@ int main(int argc, char **argv) {
     arb_mul_2exp_si(twopi, pi, 1);
 
     // ---- prime powers p^m <= X : amp, om (GPU, static), mlp = m log p (ARB) ----
-    std::vector<float> ampD, omD;
-    std::vector<arb_struct> mlp;
+    std::vector<float>  ampD, omD;
+    std::vector<double> mlpd;            // m log p in fp64 (fast phase fold)
+    std::vector<arb_struct> mlp;         // m log p in ARB  (fold fallback, huge t_base)
     n_primes_t it; n_primes_init(it);
     ulong p;
     while ((p = n_primes_next(it)) <= X) {
         ulong q = p, m = 1;
         arb_log_ui(lp, p, PREC);                         // log p, high precision
+        double lpd = log((double)p);
         for (;;) {
             arb_struct e; arb_init(&e);
             arb_mul_ui(&e, lp, m, PREC);                 // m log p  (kept in ARB)
             mlp.push_back(e);
+            mlpd.push_back((double)m * lpd);
             ampD.push_back((float)(1.0 / (m * pow((double)p, 0.5 * m))));
-            omD.push_back((float)(m * log((double)p)));
+            omD.push_back((float)((double)m * lpd));
             if (q > X / p) break;
             q *= p; ++m;
         }
@@ -139,12 +142,21 @@ int main(int argc, char **argv) {
         double rho_d   = arf_get_d(arb_midref(rhoa), ARF_RND_NEAR);
         double tbase_d = arf_get_d(arb_midref(tbase), ARF_RND_NEAR);
 
-        // fold phases for this anchor
-        for (uint32_t k = 0; k < P; ++k) {
-            arb_mul(tmp, &mlp[k], tbase, PREC);                // m log p . t_base
-            arb_div(aa, tmp, twopi, PREC); arb_floor(aa, aa, PREC);
-            arb_submul(tmp, aa, twopi, PREC);                  // mod 2pi
-            phiD[k] = (float)arf_get_d(arb_midref(tmp), ARF_RND_NEAR);
+        // fold phases for this anchor.  fp64 fmod is enough while the product
+        // m log p . t_base stays resolvable in a double (abs err ~ m log p .
+        // t_base . 2^-52 < 1e-7  =>  t_base < ~1e7 / (m log p)); above that the
+        // fractional part is lost, so fall back to the ARB fold (slow but exact).
+        if (tbase_d < 1.0e7) {
+            const double TWOPI_D = 2.0 * M_PI;
+            for (uint32_t k = 0; k < P; ++k)
+                phiD[k] = (float)fmod(mlpd[k] * tbase_d, TWOPI_D);   // m log p . t_base mod 2pi
+        } else {
+            for (uint32_t k = 0; k < P; ++k) {
+                arb_mul(tmp, &mlp[k], tbase, PREC);
+                arb_div(aa, tmp, twopi, PREC); arb_floor(aa, aa, PREC);
+                arb_submul(tmp, aa, twopi, PREC);
+                phiD[k] = (float)arf_get_d(arb_midref(tmp), ARF_RND_NEAR);
+            }
         }
 
         PC pc{};

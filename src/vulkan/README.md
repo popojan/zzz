@@ -67,10 +67,18 @@ make zvk
   `count=256` the edge zeros match the single-zero path to ~1e-5 (vs ~0.01 drift
   with one anchor). `amp`/`om` tensors are persistent; only `φ` is re-folded and
   re-uploaded per sub-window.
-- **Axis C (optional, not done):** a parallel δ-grid evaluation replacing the
-  sequential bisection (Newton avoided — `F_B` is oscillatory) would shorten the
-  critical path; worth it only once the ~0.5 s fixed Vulkan/kompute+ARB init is
-  amortised over large blocks, which profiling can decide.
+- **fp64 phase fold (done):** profiling a large block (count=2048, X=2×10⁵) showed
+  the bottleneck was the *per-sub-window ARB phase-fold* (~1.16 s of CPU
+  `arb_mul`/mod over 64 windows × 18k primes), **not** the GPU. So `φ` is folded
+  in **fp64** (`fmod(m·log p · t_base, 2π)`) whenever `t_base ≲ 10⁷` (the product
+  still resolves in a double; abs err ~ `m·log p · t_base · 2⁻⁵²`), with the ARB
+  fold kept as a height-guarded fallback above that. Result: same digits
+  (verified at #1000 and #10⁶ vs serial `--ghy -k`), large high-X block **1.36 s
+  → 0.46 s (~3×)**.
+- **Axis C — dropped by profiling.** A parallel δ-grid replacing the sequential
+  bisection would shorten GPU critical path, but the GPU was never the
+  bottleneck (the ARB fold was), so it isn't pursued. (Newton was also avoided
+  on purpose: `F_B` is oscillatory, so its derivative misleads the iteration.)
 - **Precision:** the sum uses a **df32 (two-float) accumulator** with a
   **range-reduced `sin` argument** (mod 2π — GPU `sin` degrades past ~2π). These
   are defensive; at moderate X plain fp32+Kahan already matched mpmath to 1e-6.
