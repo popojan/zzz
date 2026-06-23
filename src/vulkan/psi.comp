@@ -1,32 +1,34 @@
 #version 450
 // psi.comp -- backward step of the loop (zeros -> primes), on the GPU.
 //
-// One workgroup per candidate integer x; the 256 threads cooperatively reduce
-// the Chebyshev psi' signal over the current zeros:
-//   psi'(x) = 1 + 1/(x - x^3) - (4/sqrt x) sum_k cos(gamma_k log x)
-// and return r(x) = psi'(x) / env(x),  env(x) = envc * log(x) / x  (matched-filter
-// peak scale, envc = (20/4) Li(NZ-4)).  r > tau flags a prime power; the host
-// does the threshold + integer bookkeeping (loop.c's backward()).  df32 sum,
-// range-reduced cos -- same hygiene as zeromb.comp.
+// One workgroup per candidate integer x; the 256 threads cooperatively reduce the
+// Chebyshev psi' signal sum_k cos(gamma_k log x) over the zeros.  To kill the
+// single-NZ Dirichlet-sidelobe variance of the detector, the host needs r(x) at
+// several gamma_max truncations and takes the median.  Those truncations are PREFIX
+// SUMS of the SAME additive series, so we do ONE sweep over the zeros (1x work, not
+// Kx): accumulate cos(gamma_k log x) block by block and emit the running partial sum
+// S_b = sum over the first NB[b] zeros at each of KB=6 block boundaries
+// (gamma_max from 0.5x to 1x).  The host turns each S_b into r_b and medians them.
+// df32 sum, range-reduced cos -- same hygiene as zeromb.comp.
 
 layout(local_size_x = 256) in;
 const uint WG = 256u;
+const uint KB = 6u;                       // number of NZ truncations (0.5,0.6,...,1.0)
 
 layout(std430, binding = 0) readonly  buffer Zr  { float z[]; };   // gamma_k (zero ordinates)
-layout(std430, binding = 1) writeonly buffer Out { float r[]; };   // r(x) per candidate
+layout(std430, binding = 1) writeonly buffer Out { float S[]; };   // NX*KB cumulative cos-sums
 
 layout(push_constant) uniform PC {
-    uint  NZ;      // number of zeros
+    uint  NZ;      // number of zeros (full)
     uint  X0;      // first candidate integer
     uint  NX;      // number of candidates
-    float envc;    // (20/4) Li(NZ-4)
+    uint  KB;      // truncations (unused here; KB is fixed = 6, kept for struct match)
 } pc;
 
 const float TWO_PI     = 6.283185307179586477;
 const float INV_TWO_PI = 0.159154943091895336;
 
 shared vec2 red[WG];
-shared float rval;
 
 vec2 twoSum(float a, float b) { float s = a + b; float zz = s - a; return vec2(s, (a - (s - zz)) + (b - zz)); }
 vec2 dfAdd(vec2 a, float c)   { vec2 s = twoSum(a.x, c);   return twoSum(s.x, s.y + a.y); }
@@ -39,24 +41,29 @@ void main() {
     float x  = float(pc.X0 + g);
     float lx = log(x);
 
-    vec2 S = vec2(0.0, 0.0);                          // sum_k cos(gamma_k log x)
-    for (uint k = lid; k < pc.NZ; k += WG) {
-        float a = z[k] * lx;
-        a -= TWO_PI * floor(a * INV_TWO_PI);
-        S = dfAdd(S, cos(a));
-    }
-    red[lid] = S;
-    barrier();
-    for (uint s = WG / 2u; s > 0u; s >>= 1) {
-        if (lid < s) red[lid] = dfAddDf(red[lid], red[lid + s]);
+    vec2 cum = vec2(0.0, 0.0);             // running cumulative sum (df32), maintained by lid 0
+    uint lo = 0u;
+    for (uint b = 0u; b < KB; ++b) {
+        float fr = 0.5 + 0.1 * float(b);                       // 0.5, 0.6, ..., 1.0
+        uint hi = (b == KB - 1u) ? pc.NZ : uint(fr * float(pc.NZ));
+        if (hi > pc.NZ) hi = pc.NZ;
+        vec2 Sb = vec2(0.0, 0.0);                              // this block's partial sum
+        for (uint k = lo + lid; k < hi; k += WG) {
+            float a = z[k] * lx;
+            a -= TWO_PI * floor(a * INV_TWO_PI);
+            Sb = dfAdd(Sb, cos(a));
+        }
+        red[lid] = Sb;
         barrier();
+        for (uint s = WG / 2u; s > 0u; s >>= 1) {
+            if (lid < s) red[lid] = dfAddDf(red[lid], red[lid + s]);
+            barrier();
+        }
+        if (lid == 0u) {                                       // accumulate block into cumulative, emit
+            cum = dfAddDf(cum, red[0]);
+            S[g * KB + b] = cum.x + cum.y;
+        }
+        barrier();                                             // before next block reuses red[]
+        lo = hi;
     }
-    if (lid == 0u) {
-        float Ssum = red[0].x + red[0].y;
-        float psip = 1.0 + 1.0 / (x - x * x * x) - (4.0 / sqrt(x)) * Ssum;
-        float env  = pc.envc * lx / x;
-        rval = psip / env;
-    }
-    barrier();
-    if (lid == 0u) r[g] = rval;
 }

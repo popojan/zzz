@@ -110,10 +110,37 @@ loopvk [maxX] [kmin] [statefile] [kmin_floor]      # default: 500 4.0 zzz-loop.s
 - **Checkpoint / auto-resume / Ctrl+C** to the **same `zzz-loop.state` format** as
   `loop.c` — so CPU and GPU runs are **interoperable**: a CPU `./zzz --loop` resumes
   a `loopvk` checkpoint and vice versa (verified).
-- **Auto-anneal**: on stall, `kmin ×= 0.9` down to `kmin_floor` — verified to ceiling
-  at X*=104 (kmin=5), anneal to 4.5, and climb to 313, all `false_pos=0 missed=0`.
+- **Auto-anneal**: on stall, `kmin ×= 0.9` down to `kmin_floor`.
+
+## Backward detector: NZ-median + contiguous frontier (why it stays correct)
+
+A **single-NZ** reading of the ψ′ detector `r(x)` carries **Dirichlet-sidelobe
+variance**: `r` oscillates with `γ_max`, so right at the reach edge a prime can dip
+into a null (→ a *miss*) and a prime-adjacent composite can ride a sidelobe (→ a
+*false positive*). This is **not** a fundamental wall — the underlying signal is
+stable across NZ. So the backward step:
+
+- evaluates `r(x)` at **K=6 truncations** of the zero list (`γ_max` from ~0.5× to
+  1×) and takes the **median** per candidate — the oscillation averages out, leaving
+  a clean bimodal split (prime powers `r≈0.66`, composites `r≈0.03`). The truncations
+  are **prefix sums of the same additive series**, so the kernel sweeps each zero
+  **once** and emits the running partial sum at the 6 block boundaries — `1×` work,
+  not `6×` (`psi.comp` accumulates block by block; the host medians the 6 sums);
+- gates each candidate on the **lowest truncation's** local clear-composite fraction
+  (so every truncation actually resolves it — the committed frontier lags to
+  ~reach(0.5·NZ));
+- advances the frontier **strictly contiguously** — it stops at the first unresolved
+  candidate and never leapfrogs one (a skipped prime would be a permanent miss that
+  then corrupts the forward step's zeros).
+
+The only real cost is the **frontier lag** (the "balance" between reach, zeros, and
+detection): it commits at ~0.1·NZ instead of ~0.17·NZ, i.e. **~2–3× more zeros per
+X** — you pay zeros, not redundant compute, to average out the variance. Verified
+**CORRECT and COMPLETE on the clean state to X≈1.65×10⁵** (`check-loop.py`), through
+the 1.38–1.6×10⁵ band where the single-NZ detector produced both misses and false
+positives. (Verified *to that height*, not claimed unconditionally — push higher with
+`loopvk <maxX>` and re-check externally.)
 
 Same honest scope as `zzz --loop`: a *demonstration* (gap-scale, super-critical for a
-finite stretch, sieve still wins) — but now with both directions parallelised on
-consumer hardware. The binary is **primality-test-free**: verify a checkpoint
-*externally*, exactly like the CPU loop — `python3 doc/ghy/check-loop.py <state>`.
+finite stretch, sieve still wins). The binary is **primality-test-free**: verify a
+checkpoint *externally* — `python3 doc/ghy/check-loop.py <state>`.

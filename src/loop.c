@@ -162,6 +162,16 @@ static double locate_march(long k, const state *st, long X, double prev) {
 // backward: scan x from x_start upward (primes below x_start already known),
 // detect prime powers from the psi' peak, append new primes; conservative stop
 // at the first ambiguous non-(known-power). Returns the reach X_known.
+//
+// NOTE: a SINGLE-NZ reading of r carries Dirichlet-sidelobe variance, so near the
+// reach edge a prime can dip below TAU (a miss) and a prime-adjacent composite can
+// ride a sidelobe above it (a false positive).  This is NOT a fundamental wall --
+// the signal is stable across NZ: medianed over a spread of gamma_max, prime powers
+// sit at r~0.66 and composites at r~0.03.  The GPU path src/vulkan/loopvk fixes it
+// by medianing r over several NZ truncations (kills the oscillation) plus a strictly
+// CONTIGUOUS frontier (never leapfrog an unresolved candidate).  This CPU single-NZ
+// detector is reliable only while the frontier stays well inside the reach; for long
+// climbs prefer loopvk (or port its NZ-median + contiguity here).
 static long backward(state *st, long x_start, long Xcap) {
     long n = st->nz, Xk = x_start - 1;
     for (long x = x_start; x <= Xcap; ++x) {
