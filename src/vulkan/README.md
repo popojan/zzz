@@ -133,13 +133,23 @@ stable across NZ. So the backward step:
   candidate and never leapfrogs one (a skipped prime would be a permanent miss that
   then corrupts the forward step's zeros).
 
-The only real cost is the **frontier lag** (the "balance" between reach, zeros, and
+The phase `γ·log(x)` is carried in **df32 (two-float, hi+lo)** form so it stays
+accurate past `γ_max ~ 10⁶` (a float32 phase loses all precision there — the ~10⁷
+product carries ~1 rad of noise — and the detector stalls around X≈1.8×10⁵). Each
+zero is split `(γ_hi, γ_lo)`, `log(x)` is supplied as `(hi, lo)` from host fp64, and
+the multiply + mod-2π reduction run in df32. Two gotchas (both cost debugging): the
+error-free transforms use **Dekker splitting, not `fma()`** (fusion isn't guaranteed),
+and they **must be `precise`** — otherwise the shader compiler's fast-math
+reassociation zeroes the error terms and df32 collapses back to fp32.
+
+The real cost now is the **frontier lag** (the "balance" between reach, zeros, and
 detection): it commits at ~0.1·NZ instead of ~0.17·NZ, i.e. **~2–3× more zeros per
 X** — you pay zeros, not redundant compute, to average out the variance. Verified
-**CORRECT and COMPLETE on the clean state to X≈1.65×10⁵** (`check-loop.py`), through
-the 1.38–1.6×10⁵ band where the single-NZ detector produced both misses and false
-positives. (Verified *to that height*, not claimed unconditionally — push higher with
-`loopvk <maxX>` and re-check externally.)
+**CORRECT and COMPLETE on the clean state to X≈2.0×10⁵** (`check-loop.py`), straight
+through both the 1.38–1.6×10⁵ band where the single-NZ detector erred *and* the
+~1.8×10⁵ float32 stall. The wall is now **feasibility**: the `NMAX` zero cap
+(loopvk.cpp, default 4×10⁶) and the lag — not phase precision. (Verified *to that
+height*, not unconditionally — raise `maxX`/`NMAX` and re-check externally to go on.)
 
 Same honest scope as `zzz --loop`: a *demonstration* (gap-scale, super-critical for a
 finite stretch, sieve still wins). The binary is **primality-test-free**: verify a
