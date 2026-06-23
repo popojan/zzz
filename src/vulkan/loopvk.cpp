@@ -193,12 +193,20 @@ int main(int argc, char **argv) {
         long NZfull = (long)z.size();
         // ONE sweep: the kernel emits K prefix-sum cos-sums per candidate (the truncations
         // are prefix sums of the same additive series, so this is 1x work, not Kx).
-        auto tZ = mgr.tensor(std::vector<float>(z.begin(), z.end()));
+        // DF32 phase: split each zero gamma into hi+lo floats, and supply log(x) as hi+lo
+        // (computed here in fp64), so gamma*log(x) stays accurate past gamma~1e6 -- the
+        // float32-phase stall point (~X 1.8e5).
+        std::vector<float> zhi((size_t)NZfull), zlo((size_t)NZfull);
+        for (long k = 0; k < NZfull; ++k) { float h = (float)z[k]; zhi[k] = h; zlo[k] = (float)(z[k] - (double)h); }
+        std::vector<float> lxhi((size_t)NX), lxlo((size_t)NX);
+        for (long g = 0; g < NX; ++g) { double lx = log((double)(s0 + g)); float h = (float)lx; lxhi[g] = h; lxlo[g] = (float)(lx - (double)h); }
+        auto tZhi = mgr.tensor(zhi); auto tZlo = mgr.tensor(zlo);
+        auto tLhi = mgr.tensor(lxhi); auto tLlo = mgr.tensor(lxlo);
         auto tS = mgr.tensor(std::vector<float>((size_t)NX * K, 0.0f));
         PCbwd pc{ (uint32_t)NZfull, (uint32_t)s0, (uint32_t)NX, (uint32_t)K };
-        auto algo = mgr.algorithm<float, PCbwd>({ tZ, tS }, spv_bwd,
+        auto algo = mgr.algorithm<float, PCbwd>({ tZhi, tZlo, tLhi, tLlo, tS }, spv_bwd,
                       kp::Workgroup({ (uint32_t)NX, 1, 1 }), {}, { pc });
-        mgr.sequence()->record<kp::OpTensorSyncDevice>({ tZ })
+        mgr.sequence()->record<kp::OpTensorSyncDevice>({ tZhi, tZlo, tLhi, tLlo })
             ->record<kp::OpAlgoDispatch>(algo)->record<kp::OpTensorSyncLocal>({ tS })->eval();
         std::vector<float> S = tS->vector();
         double NZb[K], envb[K];                              // per-truncation NZ and envelope
