@@ -126,8 +126,21 @@ static double N0(double t) {
     double u = t / (2.0 * M_PI);
     return u * log(u / M_E) + 0.875;
 }
+// forward box-smoothing coefficient (loop_opts.boxc): w = g_boxc * gap(t); 0 = plain B
+static double g_boxc = 0.0;
 // F_B(t) = N0(t) + Im log P_X / pi,  Im log P_X = -sum_{p^m<=X} (1/m) p^{-m/2} sin(m t log p)
+// With g_boxc > 0 each term carries sinc(m*w*log p): that is exactly the box average
+// (1/2w) int_{t-w}^{t+w} F_B dx.  The box average of the TRUE staircase still crosses
+// k-1/2 at gamma_k when the window holds one zero, so the bisection target is unchanged;
+// the weight only damps the noisy top of the prime band.  Gate-checked 2.5-3.5x location
+// gain for kappa = gap*log X in (1.5pi, 3pi) -- the loop's operating band -- and null at
+// kappa <= pi, consistent with doc/notes/band-saturation.md (in-band functional).
 static double FB(double t, const state *st, long X) {
+    double w = 0.0;
+    if (g_boxc > 0.0) {
+        double u = t / (2.0 * M_PI);
+        if (u > 1.5) w = g_boxc * 2.0 * M_PI / log(u);
+    }
     double acc = 0.0;
     for (long i = 0; i < st->np; ++i) {
         long p = st->p[i];
@@ -135,7 +148,9 @@ static double FB(double t, const state *st, long X) {
         double lp = log((double)p), pm = (double)p, half = 1.0;
         for (long m = 1; ; ++m) {
             half = pow((double)p, -0.5 * m);
-            acc += (half / m) * sin(m * t * lp);
+            double term = (half / m) * sin(m * t * lp);
+            if (w > 0.0) { double a = m * w * lp; term *= sin(a) / a; }
+            acc += term;
             if (pm > (double)X / p) break;
             pm *= p;
         }
@@ -322,6 +337,7 @@ void loop_opts_default(loop_opts *o) {
     o->contrast = 0;
     o->batch = 2000;
     o->fresh = 0;
+    o->boxc = 0.375;
     o->verbose = 0;
 }
 
@@ -333,6 +349,7 @@ static int file_exists(const char *path) {
 
 int loop_run(const loop_opts *o) {
     state st; memset(&st, 0, sizeof st);
+    g_boxc = o->boxc;
 
     // auto-resume: bare --loop continues from a checkpoint if one is present.
     int resume = o->fresh ? 0 : (o->resume ? 1 : file_exists(o->state_path));
@@ -394,8 +411,10 @@ int loop_run(const loop_opts *o) {
                 // fixed point at this kmin: anneal the margin down and keep climbing
                 no_improve = (st.Xknown >= best_X) ? 0 : no_improve + 1;
                 if (!o->anneal || st.kmin <= o->kmin_floor + 1e-9 || no_improve >= 2) {
-                    fprintf(stderr, "loop: plain-B ceiling reached -- X*=%ld at kmin=%.3f "
-                            "(go further with a sharper/Weil forward step)\n", best_X, st.kmin);
+                    fprintf(stderr, "loop: %s ceiling reached -- X*=%ld at kmin=%.3f "
+                            "(go further with a %s forward step)\n",
+                            g_boxc > 0.0 ? "box-B" : "plain-B", best_X, st.kmin,
+                            g_boxc > 0.0 ? "Weil" : "box-B/Weil");
                     break;
                 }
                 st.kmin *= 0.9;
