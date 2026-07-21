@@ -50,3 +50,17 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Documentation subfolders NOT part of our work:
+#  - external reference PDFs by other authors (copyright)
+#  - unrelated Pell-branch material
+doc/refs/
+doc/pell/
+CLAUDE.md
+
+# zzz --loop runtime checkpoints + per-run plots
+*.state
+*.state.tmp
+/loop-zero-errors.png
+/loop-band-rigidity.png
+/loop-collapse.png

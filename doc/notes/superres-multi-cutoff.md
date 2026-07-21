@@ -1,0 +1,384 @@
+# Sub-Rayleigh zero recovery: full-profile fits and multi-cutoff deconvolution
+
+*Plan + formula reference, 2026-06-10. Follow-up to
+[`bootstrap-hybrid.md`](bootstrap-hybrid.md), which established the validity
+threshold $X \gtrsim \sqrt{T/2\pi}$ for crossing-based methods. This note
+specifies the experiments that attack the regime **below** that threshold,
+with every formula the code implements.*
+
+***Status: lab log, complete.* Sections 1–6 are the original plan and are
+kept as written; several of their expectations (and step 2's "GO" verdict
+in §7) were refuted or retracted by later results, in place. The final
+verdict — method B saturates the band below $\mathrm{gap}\cdot\log X = \pi$
+— and the clean synthesis of the whole program live in
+[`band-saturation.md`](band-saturation.md).**
+
+## 1. The problem, restated as information theory
+
+The observable on the critical line is band-limited: primes $p^m \le X'$
+contribute oscillations $e^{-imt\log p}$, i.e. frequency content in
+$[0, L']$, $L' = \log X'$. Observed on a $T$-window of width $\Delta_T$, such
+a signal carries about
+
+$$\mathrm{DOF} \;\approx\; \frac{L'\,\Delta_T}{\pi}
+\qquad \text{(Shannon number)}$$
+
+well-conditioned degrees of freedom, while the window contains
+$\Delta_T \cdot \frac{1}{2\pi}\log\frac{T}{2\pi}$ zeros. Unknowns exceed DOF
+exactly when $L' < \tfrac12 \log(T/2\pi)$, i.e. $X' < \sqrt{T/2\pi}$ — the
+empirical validity law of the bootstrap is the Shannon-number criterion.
+
+**But** sub-Rayleigh information is attenuated, not destroyed: zero positions
+enter the band analytically, and our data is *exact* — prime sums carry no
+measurement noise, only the working precision (hundreds of bits) and the
+explicit-formula identity error ($\sim \sqrt X/(T\log X)$, about $10^{-30}$
+in our regimes). Parametric point-source recovery from exact band-limited
+data (Prony 1795; matrix pencil; ESPRIT; Candès–Fernández-Granda) has **no
+Rayleigh limit**; its price is conditioning $\sim \rho^{-(m-1)}$ ($\rho$ =
+separation in Rayleigh cells, $m$ = sources per cell), payable in precision
+bits. Crossing-based estimators (method B, `--boot`) are linear,
+single-functional readers of the field and *are* Rayleigh-limited — that is
+what dies at $X \approx \sqrt{T/2\pi}$, not the information.
+
+*[Post-hoc: this paragraph survived only in oracle form. The exact-data
+super-resolution argument presumes the far zone known; self-contained, the
+information below the threshold is genuinely inaccessible — see E4 step 3
+in §7 and `band-saturation.md`.]*
+
+## 2. Notation and data field
+
+$$s = \tfrac12 + iT, \qquad X' = p_{k'}, \qquad L' = \log X',
+\qquad \log P_{X'}(s) = \sum_{p^m \le X'} \frac{1}{m\,p^{ms}}.$$
+
+The data field (what `zero_count_ghy` computes, as a function of both
+arguments) is
+
+$$\boxed{\;\mathcal F(T, L') \;=\; N_0(T) + \frac{1}{\pi}\arg P_{X'}\!\big(\tfrac12+iT\big)\;}
+\qquad N_0(T) = \frac{T}{2\pi}\log\frac{T}{2\pi e} + \frac78 .$$
+
+**Multi-cutoff data is free**: one pass over the primes yields
+$\mathcal F(T, L')$ for *every* prefix cutoff simultaneously, via cumulative
+sums of the per-prime terms (including $p^m \le X'$ power terms). For a
+$T$-grid $\{T_i\}$ and cutoff grid $\{L'_l\}$ the cost is one
+$|\{T_i\}| \times k$ phase matrix.
+
+## 3. Forward model
+
+From the explicit-formula decomposition (GHY) with
+$\operatorname{Im} E_1(iyL') = \mathrm{Si}(yL') - \tfrac{\pi}{2}\mathrm{sign}(y)$,
+each zero's sharp step $H(T-\gamma_j)$ (in $N$) and its smearing term combine
+into one smooth profile:
+
+$$H(y) - \tfrac12\mathrm{sign}(y) \equiv \tfrac12
+\;\;\Longrightarrow\;\;
+H(T-\gamma_j) + \frac{1}{\pi}\Big[\mathrm{Si}\big((T-\gamma_j)L'\big) - \frac{\pi}{2}\mathrm{sign}(T-\gamma_j)\Big]
+= \frac12 + \frac{1}{\pi}\mathrm{Si}\big((T-\gamma_j)L'\big).$$
+
+With $M$ consecutive window zeros $\gamma_1 < \cdots < \gamma_M$ of ordinals
+$n_0, \ldots, n_0 + M - 1$ (zeros below the window contribute their full
+unit steps, zeros above contribute $\approx 0$, both up to tails):
+
+$$\boxed{\;\mathcal F(T, L') \;=\; (n_0 - 1) \;+\; \sum_{j=1}^{M}\Big[\frac12 + \frac{1}{\pi}\,\mathrm{Si}\big((T-\gamma_j)L'\big)\Big] \;+\; R(T, L')\;}$$
+
+The residual field $R$ collects (i) far-zero tails and (ii) the
+explicit-formula identity error:
+
+$$R(T,L') \;=\; \frac{1}{\pi}\sum_{j \notin \text{window}}\Big[\mathrm{Si}\big((T-\gamma_j)L'\big) - \frac{\pi}{2}\mathrm{sign}(T-\gamma_j)\Big] + \varepsilon_{\rm id},
+\qquad \Big|\,\text{tail term}\,\Big| \approx \frac{|\cos((T-\gamma_j)L')|}{\pi\,|T-\gamma_j|\,L'} .$$
+
+Key structural fact: a far zero's tail oscillates in $T$ at frequency
+$\approx L'$ — it lives at the **band edge**. Its natural nuisance basis on
+the window is therefore
+
+$$R(T,L') \;\approx\; \alpha(L')\cos(TL') + \beta(L')\sin(TL') + \text{low-order smooth in } T,$$
+
+with $\alpha,\beta$ slowly varying. In practice we suppress $R$ by (a) a
+buffer of real fitted zeros beyond the core, (b) a smooth $T$-window, and
+(c) optionally the band-edge nuisance pair above.
+
+## 4. Estimators
+
+### 4a. Single-$L$ full-profile weighted least squares (experiment E2)
+
+Replace "read one crossing per zero" by fitting the whole window profile.
+With $\theta = (\gamma_1,\ldots,\gamma_M;\, c)$, $c$ = linear nuisance
+coefficients (constant offset, optional band-edge pair / low-order poly):
+
+$$\chi^2(\theta) = \sum_i w_i\,\big[\mathcal F(T_i, L) - \mathcal M(T_i, L; \theta)\big]^2,
+\qquad w_i = \exp\!\Big(-\frac{(T_i - T_0)^2}{2\sigma_T^2}\Big),$$
+
+$$\mathcal M(T, L; \theta) = (n_0-1) + \sum_{j=1}^{M}\Big[\frac12 + \frac{1}{\pi}\mathrm{Si}\big((T-\gamma_j)L\big)\Big] + c \cdot \mathrm{basis}(T).$$
+
+Gauss–Newton / Levenberg–Marquardt with the analytic Jacobian
+($\mathrm{sinc}(u) := \sin(u)/u$):
+
+$$\frac{\partial \mathcal M}{\partial \gamma_j}
+= -\frac{L}{\pi}\,\mathrm{sinc}\big((T-\gamma_j)L\big),
+\qquad
+\delta\theta = \big(J^\top W J + \lambda I\big)^{-1} J^\top W\, r .$$
+
+Linear nuisances are eliminated exactly per iteration (variable projection):
+for fixed $\gamma$, $\hat c = (B^\top W B)^{-1} B^\top W (\mathcal F - \mathcal M_\gamma)$.
+
+Initialization: method-B seeds (validated to be within $\sim 0.3$ mean gaps —
+well inside the basin). Working precision: the data is computed at
+`PREC` $\ge 256$ bits; the normal equations may be solved in high precision
+if conditioning demands it.
+
+### 4b. Multi-$L$ fit (experiment E3)
+
+Same residual extended over a cutoff grid, with an $L'$-taper $v_l$ (e.g.
+Hann over $[L_{\min}, L]$) so cutoff endpoints don't dominate:
+
+$$\chi^2(\theta) = \sum_{l}\sum_i v_l\, w_i\,\big[\mathcal F(T_i, L'_l) - \mathcal M(T_i, L'_l; \theta)\big]^2 .$$
+
+Rationale for the second dimension even though $[0,L'] \subset [0,L]$ adds no
+new frequencies: at fixed $T$ each zero contributes
+$-\cos\big((T-\gamma_j)L'\big)/\big(\pi (T-\gamma_j) L'\big)$, an oscillation
+in $L'$ whose **frequency is the distance** $|T - \gamma_j|$ (this is exactly
+the empirically validated cutoff-sweep law, corr 0.96–0.98). The collective
+translation mode that defeats the bootstrap — all seeds shifted together —
+changes the multi-$L$ field visibly, so the soft direction is lifted.
+
+### 4c. Algebraic variant (optional, if 4a/4b show promise)
+
+The $T$-derivative field is a band-limited sum of identical kernels,
+
+$$\partial_T \mathcal F(T, L) = \frac{L}{\pi}\sum_j \mathrm{sinc}\big((T-\gamma_j)L\big) + \partial_T R,$$
+
+whose windowed Fourier transform gives (up to the known window convolution)
+samples of the pure exponential sum
+$\hat\mu(\omega) = \sum_j e^{-i\omega \gamma_j}$ on $|\omega| < L$. On a
+uniform grid $\omega_m = m\,\Delta\omega$ this is a Prony system
+$h_m = \sum_j a_j z_j^m$, $z_j = e^{-i\Delta\omega\,\gamma_j}$, solvable by
+matrix pencil / ESPRIT with no resolution limit at exact data. Conditioning
+$\sigma_{\min} \sim \rho^{\,m-1}$ with $\rho = \mathrm{gap}\cdot L / 2\pi$;
+e.g. at $10^{36}$, $k=10^4$: $\rho \approx 0.145$, $m \approx 7$ zeros per
+Rayleigh cell $\Rightarrow$ amplification $\sim 10^{5}$–$10^{8}$ — trivial at
+256–512 bits *if* the systematic $R$-leakage is kept below the target
+accuracy. The fits in 4a/4b are the pragmatic, better-conditioned first cut.
+
+## 5. Experiments
+
+**E1 — true-seed control (premise check).** Verify that leave-one-out
+subtraction itself is healthy below the threshold and only *self*-seeding is
+blind. Using **Odlyzko zeros as seeds**, locate targets via the
+leave-one-out hybrid crossing
+
+$$F_C^{(j)}(T) = N_0(T) + \frac{\arg P_X + \arg Z_X^{\mathrm{excl}\,j}}{\pi},
+\qquad \log Z_X(s) = -\sum_{\rho} E_1\big((s-\rho)\log X\big),$$
+
+bisecting $F_C^{(j)} = n - \tfrac12$. Implementation: `zzz --seeds FILE`
+(new) — full-precision decimal ordinates parsed into arb (doubles cannot
+hold absolute $\gamma$ at these heights: resolution
+$2^{-52}\gamma \approx 3\times10^5$ at $10^{21}$, which also rules out
+`zhybrid` here), combined with `-R 0` so that only the target is relocated
+by the final leave-one-out bisection while the true neighbours stay put.
+Regimes: $10^{21}$, $k=10^4$ (gap·$L \approx 1.6$, self-boot gain 0.95×),
+$10^{22}$ at $k=10^4$, and the $10^{36}$ proxy $10^{22}$, $k=600$
+(gap·$L \approx 1.1$). *Prediction*: true seeds restore a clear gain;
+failure falsifies the coherent-seed explanation.
+
+**E2 — single-$L$ full-profile fit** (§4a) at the proxy regime
+$10^{22}$, $k=600$, offsets 50–69 (the `boot-regime-e22-k600.tsv` ensemble):
+baselines B = 0.0261, boot = 0.0258 mean |err|. Success: mean |err|
+$\le 0.017$ (≥1.5×); stretch: $\le 0.013$ (2×).
+
+**E3 — multi-$L$ fit** (§4b), same ensemble. Cutoff grid: $k' \in$
+$\{150, 200, 270, 360, 450, 600\}$ ($L' \approx 6.8$–8.4), Hann taper.
+
+**E4 — scale up** only if E2/E3 succeed: $10^{21}/10^{22}$ at $k = 10^4$,
+then the $10^{36}$ showcase zero (validation = the single published
+Bober–Hiary value). *[Naming note: E2/E3 did not succeed and this scale-up
+never ran; the label "E4" was reused for the Weil-formula program
+(steps 1–3 in §7), an unrelated escalation.]*
+
+Grid defaults (E2/E3): $T$-grid $T_0 \pm 4\,\mathrm{gap}\cdot W_{\rm eff}$
+… in practice $T_0 \pm 2.5$ with 150–250 points, $\sigma_T \approx 0.8$;
+window zeros $M = 2\cdot 24 + 1$ (core ±12 reported, rest buffer);
+arb precision 256 bits for data generation; fit prototyped in
+`wolframscript` (data either Wolfram-native prime sums at 40+ digits or
+`zghy` dumps).
+
+## 6. Error budget and expectations
+
+| term | size (proxy regime) | control |
+|---|---|---|
+| identity error $\varepsilon_{\rm id}$ | $\sim 10^{-30}$ | none needed |
+| arithmetic | $2^{-256}$ scale | raise PREC |
+| far-zero leakage through window | the real floor | buffer + taper + band-edge nuisance |
+| conditioning amplification | $\rho^{-(m-1)} \sim 10^2$–$10^8$ | precision bits |
+| basin of attraction (NLS) | seeds within 0.3 gap | B init, LM damping |
+
+The honest uncertainty is whether the correlated far-field leakage can be
+pushed below B's 0.026 at the proxy regime; conditioning and noise are
+non-issues by construction. If E2 fails but E1 succeeds, the verdict is that
+full-profile fitting still doesn't exploit the evanescent band and the
+algebraic route (4c) gets its turn.
+
+## 7. Results
+
+**E1 — true-seed control: premise confirmed.** With Odlyzko seeds
+(`zzz --seeds FILE -R 0`, window ±28 or ±32), the leave-one-out relocation
+works *below* the threshold where self-seeding gives nothing
+(mean |err| over 10–20 zeros; B baselines from `boot-validate.tsv` /
+`boot-regime-e22-k600.tsv`):
+
+| regime | gap·$L$ | self-boot gain | true-seed gain |
+|---|---|---|---|
+| $10^{21}$, k=10⁴ | 1.6 | 0.95× | **5.9×** (0.0242 → 0.0041) |
+| $10^{22}$, k=10⁴ | 1.55 | 0.93× | **3.5×** (0.0119 → 0.0034) |
+| $10^{22}$, k=600 | 1.1 | ~1× | **2.7×** (0.0261 → 0.0096) |
+
+No bracket-failure fallbacks. The subtraction identity is healthy below the
+Riemann–Siegel scale; only self-computed seeds are blind. The true-seed
+numbers are the realistic ceiling for any seed-improvement scheme feeding
+the relocation step.
+
+**E2 — single-L full-profile fit: clean negative.** `e2-singleL-fit.wls`
+($10^{22}$, k=600, offsets 50–69, $W=24$, band-edge nuisance pair, B-seed
+init): mean |err| 0.0258 vs B 0.0261 — **gain 1.01×**, with per-zero errors
+tightly correlated with B's. Conclusion: the degeneracy lives in the
+single-cutoff likelihood itself, not in how B reads it — the far-zero
+leakage field is absorbed along the collective soft mode, so replacing
+crossing-reading by maximum likelihood changes nothing at one cutoff.
+
+**E3 — multi-cutoff fit: negative, worse than B.** `e3-multiL-fit.wls`
+(cutoffs $X' \in \{863, 1223, 1733, 2423, 3181, 4409\}$, per-cutoff band-edge
+nuisance blocks, $W=24$): mean |err| 0.0483 vs B 0.0261 — **gain 0.54×**.
+Diagnosis: (i) the low-cutoff slices ($L' \approx 6.8$, kernel $\approx 3$
+gaps wide) are *more* coherent than the top cutoff and pull the fit along
+the soft mode harder than the top slice constrains it; (ii) the 24 nuisance
+parameters absorb precisely the cross-cutoff differences that were supposed
+to identify the zeros; (iii) fundamentally, prefix sums are analytically
+derivable from the full-cutoff window field (band-limited ⇒ entire of
+exponential type), so multi-$L$ carries **no new information** — only a
+different, and evidently worse, optimization geometry.
+
+### Verdict and the one principled escape left
+
+Scoreboard at the coherent-deficit proxy regime ($10^{22}$, k=600,
+B = 0.0261): self-boot ~1×, single-$L$ ML 1.01×, multi-$L$ ML 0.54×,
+**true-seed oracle 2.7×**. The oracle gain proves the regime is recoverable
+*given* the local configuration; every practical estimator built on the
+GHY kernel model fails to extract it. A likely co-culprit alongside the
+soft mode is **forward-model error**: the $E_1$/Si kernel is the
+$X\to\infty$ limit of GHY's smoothed kernel, and the day-one cutoff sweep
+already showed the Si model captures only 54–80 % of the rms at finite $X$
+— orders of magnitude above the evanescent amplitudes a sub-Rayleigh fit
+must read.
+
+The clean escape, if this is ever resumed: drop the kernel approximation
+entirely and fit through the **Weil explicit formula** with compactly
+supported test functions $\varphi$ (with $\hat\varphi$ inside the allowed
+band):
+
+$$\sum_\rho \varphi(\gamma_\rho)
+= \frac{1}{2\pi}\int \varphi(t)\,\big(\log\tfrac{t}{2\pi} + O(t^{-2})\big)\,dt
+\;-\; \frac{1}{\pi}\sum_{p,m} \frac{\log p}{p^{m/2}}\,\hat\varphi\!\Big(\frac{m\log p}{2\pi}\Big)
+\;+\; (\text{pole}/\Gamma\ \text{terms}),$$
+
+an **exact identity** — zero model error; the only floor left is far-zero
+leakage through $\varphi$'s tails (Slepian-optimal concentration) versus
+the same band constraint. That isolates the genuinely open question:
+is the evanescent signal above the leakage floor at exact arithmetic?
+
+**E4 step 1 — identity harness: validated to 34 digits.**
+`e4-weil-identity.wls` implements the formula above with
+$h(r) = H(r-T) + H(r+T)$, $H(x) = \mathrm{sinc}(bx)^{2q}$, band
+$a = 2qb = \log X$, whose Fourier partner $g(u) = 2\cos(Tu)\,\hat g_H(u)$
+is a cardinal B-spline vanishing identically for $|u| > \log X$ — the prime
+side cuts off at $p^m \le X$ *exactly*. Against Odlyzko's 1000-digit zeros
+(first 100, `zeros2`, X = 10⁵, T ∈ {γ₅₀, 143.5, 100}):
+$q{=}4$ closes to $10^{-16.4..-17.7}$ (the predicted sinc⁸ zero-tail floor,
+correct sign), $q{=}10$ closes to $10^{-34}$ at all three centers. Every
+constant in the formula is pinned.
+
+**E4 step 2 — singular-spectrum probe: GO, with a refined threshold.**
+*[Retracted in step 3: the "GO", the refined threshold ~1.2, and the
+"240k–14M primes for $10^{36}$" projection all assumed the far zone known
+(oracle). Kept as written for the record.]*
+`e4-spectrum-probe.wls`. The space of available functionals is at best the
+Paley–Wiener space $PW_a$ with kernel $K(x,y) = \sin(a(x-y))/\pi(x-y)$; the
+linearized design for window-zero perturbations has Gram
+$G_{jk} = -s''(\gamma_j - \gamma_k)$, $s(z) = \sin(az)/\pi z$,
+$G_{jj} = a^3/3\pi$ — closed form, probed on true $10^{22}$ zeros at
+200-digit precision. Findings:
+
+| config | gap·$a$ | need (0.01 gap) | prolate leakage $e^{-2a\cdot w}$ | verdict |
+|---|---|---|---|---|
+| k=600, ±3 (M=45) | 1.12 | 4e−25 | ~1e−22 | marginal fail |
+| k=600, ±6 (M=89) | 1.12 | 3e−48 | ~2e−44 | fail (widening loses) |
+| k=10⁴, ±6 | 1.55 | 7e−35 | ~6e−61 | **GO, 26 orders of margin** |
+| 10³⁶ regime, k=10⁴ | 0.92 | 5e−56 | ~2e−34 | fail by 22 orders |
+
+- The eigen-plunge is ~2× steeper than the Landau–Widom estimate
+  (~1.7 $\log_{10}\lambda$ per rank past Shannon) but finite — full-window
+  recovery needs 25–56 digits of functional data, trivial for arb. The
+  binding constraint is the **race** between needed accuracy
+  ($\sim$ 8–21 digits per unit window half-width, from the measured plunge ×
+  zero density) and admissible-functional leakage suppression
+  ($2a/\ln 10$ digits per unit). Equal slopes give the refined validity
+  boundary $\mathrm{gap}\cdot\log X \gtrsim 1.2$ (bracketed by the
+  measured 1.12-fail / 1.55-pass configs) — versus $\pi$ for every
+  crossing/ML method measured before (E2/E3, bootstrap).
+- Consequence for the endgame: at $10^{36}$ the old threshold demanded
+  $X \sim 10^{17}$; the refined one needs $\mathrm{gap}\cdot\log X \approx
+  1.2\text{–}1.5$, i.e. $X \approx 3\times10^6$–$10^8$ — **240k–14M primes,
+  computationally feasible**.
+- Step 3 target, fully quantified: implement the fit at the GO config
+  ($10^{22}$, k=10⁴): near-prolate windows (the 26-order margin tolerates
+  far-from-optimal windows), Weil-evaluator data at ~60 digits, Newton
+  solve; success = beating the true-seed ceiling (3.5×) toward the
+  0.01-gap information bound (~20×) against Odlyzko truth. If realized,
+  the same engineering at k ~ 10⁶ attacks $10^{36}$ itself.
+
+**E4 step 3 — the fit, and the final answer: B saturates the band.**
+`e4-fit.wls`. Functionals: windowed modulations
+$W(x)\cos/\sin(\omega x)$, $W = \mathrm{sinc}(3x/16)^{16}$ (band 3),
+$\omega \le a-3$, single centre; Weil pairs are closed-form B-splines, the
+archimedean term collapses at height $10^{21}$ to $2\log(T_c/2\pi)\hat
+g_W(\omega)$ (corrections $O(1/T_c)$); phases $\cos(T_c u)$ folded at 130
+digits, all else machine. Family algebra validated as an identity at
+$T=143.5$ to $10^{-8}$ (light-quadrature floor). Fit: 178 unknowns
+(window ±12), far zone ±20 fixed at B seeds, 114 functionals, Tikhonov
+prior at B ($\sigma_p = 0.012$), Gauss–Newton with 50-digit normal
+equations — converges to the data floor (|r| $14 \to 3.3\times10^{-6}$,
+steps $10^{-11}$).
+
+Result at $10^{22}{+}5000$, k=10⁴ (60 central zeros): **gain 0.994×**,
+fit errors ≡ B errors (corr 0.9993). The decisive control:
+
+| configuration | $\|r\|$ against exact Weil data |
+|---|---|
+| B positions (raw) | 0.53 |
+| fitted positions (errors ≈ B's, 0.0166) | $3.3\times10^{-6}$ (floor) |
+| **true positions** | $5.0\times10^{-6}$ (floor) |
+
+Truth and the B-displaced configuration are *equally consistent* with
+every band-limited functional of the primes — a constructive
+demonstration that two configurations 0.017 apart produce identical
+band-$a$ data to the working floor. **Below $\mathrm{gap}\cdot\log X =
+\pi$, method B already saturates the information content of primes
+$\le X$ about individual zeros.** The bootstrap (crossings), E2/E3
+(kernel ML), and E4 (exact-identity ML) all reproduce B for this one
+reason; E1's oracle gains measure what *external* knowledge would buy,
+not what the primes contain.
+
+Consequently the step-2 projection "$10^{36}$ feasible at 240k–14M
+primes" is **retracted** — it was conditional on the far zone being
+known (oracle); self-contained, the evanescent channels cannot be used.
+The validity boundary for beating B from primes alone is
+$\mathrm{gap}\cdot\log X \gtrsim \pi$, i.e. $X \gtrsim \sqrt{T/2\pi}$ —
+the Riemann–Siegel wall is information-theoretic, not algorithmic.
+
+What remains open, stated precisely: distinguishability *below* today's
+floor ($5\times10^{-6}$, set by far-zone-at-B and machine arithmetic).
+Quantization/positivity of the zero measure could in principle break the
+degeneracy at some far smaller scale (the manifold of data-consistent
+configurations is finite-dimensional and the true zeros are rigid
+points, not a continuum); five independent negatives put a heavy prior
+against it being reachable, but today's experiments bound it only down
+to the floor. A positive use of the machinery is also untested: *above*
+the threshold the exact-identity fit should beat the bootstrap's
+constants (it wastes no information on crossing-reading).

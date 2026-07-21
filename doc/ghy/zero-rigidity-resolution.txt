@@ -1,0 +1,36 @@
+# ZERO-RIGIDITY RESOLUTION  (Nuse=60000, gamma<=47531., gap=0.704 t-units)
+# u_n = S(gamma_n); Var^(1/2)(u) = sig0 = 0.3065 (predict-the-mean baseline)
+
+# Test 1 -- best two-sided interpolation, OUT OF SAMPLE.
+#   sigma_cond is in GAP units (= position resolution / gap), height-independent.
+m(each side)   sigma_cond   sigma_cond/sig0
+1              0.3030       0.989
+2              0.3024       0.987
+4              0.2884       0.941
+8              0.1133       0.370
+16             0.0240       0.078
+24             0.0153       0.050
+32             0.0096       0.031
+
+# reference scales (gap units):  B error ~ 0.13   |   5e-6 floor ~         -6
+7.1 × 10
+# rigidity resolution sigma_cond (best m) = 0.009596 gap
+
+# Test 2 -- can rigidity DENOISE a coherent displacement? (Delta=0.13 gap, m=24)
+#   corrected = 1 - ||denoised - truth|| / ||displaced - truth||  (1=fully fixed, 0=blind)
+#   Lc = coherence length of the displacement, in gaps.  B's aliased deficit ~ Lc 2-4.
+Lc(gaps)   corrected
+0          0.114
+1          0.125
+2          0.214
+3          0.332
+5          0.542
+8          0.772
+12         0.921
+
+# VERDICT
+# Test 1: rigidity resolves one zero to sigma_cond=0.0096 gap from 64 TRUE neighbours -- SHARP, far below B's 0.13 (Ghosh-Peres).
+# Power control: white (Lc=0) displacement corrected by 0.11 -> the denoiser has teeth.
+# POSITIVE / PARTIAL: coherent B-mode corrected 0.332 -- rigidity refines B even in the coherent mode; PURSUE.
+
+# wrote /home/jan/github/zzz/doc/ghy/zero-rigidity-resolution.tsv

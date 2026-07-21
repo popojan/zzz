@@ -1,0 +1,33 @@
+10000 zeros loaded (10^22 block)
+== A: proxy k=600, +-3:  M=45  a=8.3914031853579376277`6.  mean gap=0.13334034613636364  gap*a=1.1189126053054117  Shannon S=NumberForm[15.67108153795247, 4]
+   log10(lam_n/lam_1) at n=S,S+8,S+16,...:
+   {{16, NumberForm[-1.4222074769777258, 5]}, {24, NumberForm[-7.512089733150156, 5]}, {32, NumberForm[-18.731724708114378, 5]}, {40, NumberForm[-34.06333018003395, 5]}, {45, NumberForm[-47.158924411559134, 5]}}
+   usable ranks: 42/45 above 1e-40,   45/45 above 1e-80
+   sqrt diag G^-1 (error amplification, data->position):
+     central third: min=ScientificForm[1.8408637029550716*^20, 3]  median=ScientificForm[3.394299132339647*^21, 3]
+     edges:         max=ScientificForm[8.847933765298126*^21, 3]
+   data accuracy for central zero to 0.1 gap: ScientificForm[3.928361671661327*^-24, 3]   to 0.01 gap: ScientificForm[3.9283616716613263*^-25, 3]
+== B: proxy k=600, +-6:  M=89  a=8.3914031853579376277`6.  mean gap=0.13377296181818182  gap*a=1.1225428579158567  Shannon S=NumberForm[31.443851061886864, 4]
+   log10(lam_n/lam_1) at n=S,S+8,S+16,...:
+   {{32, NumberForm[-2.012350868978984, 5]}, {40, NumberForm[-6.786006078836331, 5]}, {48, NumberForm[-15.871077888100068, 5]}, {56, NumberForm[-27.0700466849949, 5]}, {64, NumberForm[-39.69508632085521, 5]}, {72, NumberForm[-54.26734996508263, 5]}, {80, NumberForm[-70.72916334545197, 5]}, {88, NumberForm[-90.96247527267397, 5]}, {89, NumberForm[-94.77443717574546, 5]}}
+   usable ranks: 64/89 above 1e-40,   83/89 above 1e-80
+   sqrt diag G^-1 (error amplification, data->position):
+     central third: min=ScientificForm[1.5284436191927565*^43, 3]  median=ScientificForm[4.902569405646304*^44, 3]
+     edges:         max=ScientificForm[5.4628279444109003*^45, 3]
+   data accuracy for central zero to 0.1 gap: ScientificForm[2.728629637840825*^-47, 3]   to 0.01 gap: ScientificForm[2.7286296378408247*^-48, 3]
+== C: e22 k=1e4, +-6:  M=89  a=11.5591313403591496669`6.  mean gap=0.13377296181818182  gap*a=1.5462992354452134  Shannon S=NumberForm[43.31380536037706, 4]
+   log10(lam_n/lam_1) at n=S,S+8,S+16,...:
+   {{44, NumberForm[-2.1917449268568334, 5]}, {52, NumberForm[-6.738606430220935, 5]}, {60, NumberForm[-15.806263064665476, 5]}, {68, NumberForm[-26.87170504556768, 5]}, {76, NumberForm[-39.87883110334448, 5]}, {84, NumberForm[-55.3676637176296, 5]}, {89, NumberForm[-68.29625730692142, 5]}}
+   usable ranks: 76/89 above 1e-40,   89/89 above 1e-80
+   sqrt diag G^-1 (error amplification, data->position):
+     central third: min=ScientificForm[9.4874159887965*^29, 3]  median=ScientificForm[1.9236105680161678*^31, 3]
+     edges:         max=ScientificForm[2.1367881088799655*^32, 3]
+   data accuracy for central zero to 0.1 gap: ScientificForm[6.954264238428611*^-34, 3]   to 0.01 gap: ScientificForm[6.954264238428612*^-35, 3]
+== D: 10^36 regime (rescaled), k=1e4:  M=89  a=11.5591313403591496669`6.  mean gap=0.07999751053566206  gap*a=0.9247017311834826  Shannon S=NumberForm[25.902069847013234, 4]
+   log10(lam_n/lam_1) at n=S,S+8,S+16,...:
+   {{26, NumberForm[-1.7823406837290166, 5]}, {34, NumberForm[-6.527598662962777, 5]}, {42, NumberForm[-15.838137733202968, 5]}, {50, NumberForm[-27.11294840906536, 5]}, {58, NumberForm[-40.049836460308335, 5]}, {66, NumberForm[-54.69727372434175, 5]}, {74, NumberForm[-70.97702814047001, 5]}, {82, NumberForm[-89.54127545975356, 5]}, {89, NumberForm[-110.34225250453093, 5]}}
+   usable ranks: 57/89 above 1e-40,   78/89 above 1e-80
+   sqrt diag G^-1 (error amplification, data->position):
+     central third: min=ScientificForm[4.425245506909231*^50, 3]  median=ScientificForm[1.6668745572184467*^52, 3]
+     edges:         max=ScientificForm[1.87666940889697*^53, 3]
+   data accuracy for central zero to 0.1 gap: ScientificForm[4.7992520006517964*^-55, 3]   to 0.01 gap: ScientificForm[4.799252000651796*^-56, 3]

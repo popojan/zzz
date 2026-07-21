@@ -1,0 +1,94 @@
+=== k=100000 run ===
+building prime tables, k=100000 X=1299709 a=14.0776509512206293181`6.
+prime powers: 100262
+B seeds: 4850..5150   boot baseline: 10 zeros
+fit zeros M=94  far fixed: 62  kappa = 3.613981395170444
+57 frequencies, 114 functionals
+  GN iter 1: |r| = ScientificForm[0.937696471421874, 3]  max|dx| = ScientificForm[0.06030469873559314, 3]
+  GN iter 2: |r| = ScientificForm[0.07321766675435182, 3]  max|dx| = ScientificForm[0.012132899195187192, 3]
+  GN iter 3: |r| = ScientificForm[0.00044481106504310126, 3]  max|dx| = ScientificForm[0.0020553030144147793, 3]
+  GN iter 4: |r| = ScientificForm[1.486656914715268*^-6, 3]  max|dx| = ScientificForm[0.00018464434847209588, 3]
+  GN iter 5: |r| = ScientificForm[6.316049007816439*^-7, 3]  max|dx| = ScientificForm[9.09385576414902*^-6, 3]
+  GN iter 6: |r| = ScientificForm[6.315978952271013*^-7, 3]  max|dx| = ScientificForm[7.629997425496314*^-7, 3]
+  GN iter 7: |r| = ScientificForm[6.315984097461734*^-7, 3]  max|dx| = ScientificForm[6.818959445587148*^-8, 3]
+  GN iter 8: |r| = ScientificForm[6.315983709335394*^-7, 3]  max|dx| = ScientificForm[6.060785159240892*^-9, 3]
+  GN iter 9: |r| = ScientificForm[6.315983679258402*^-7, 3]  max|dx| = ScientificForm[5.177578377557568*^-10, 3]
+  GN iter 10: |r| = ScientificForm[6.315983725070032*^-7, 3]  max|dx| = ScientificForm[1.265609307664539*^-10, 3]
+  GN iter 11: |r| = ScientificForm[6.315983699416812*^-7, 3]  max|dx| = ScientificForm[1.6671636284164873*^-10, 3]
+  GN iter 12: |r| = ScientificForm[6.315983728590919*^-7, 3]  max|dx| = ScientificForm[1.3539352738135734*^-10, 3]
+  GN iter 13: |r| = ScientificForm[6.315983728300613*^-7, 3]  max|dx| = ScientificForm[1.11711344491334*^-10, 3]
+  GN iter 14: |r| = ScientificForm[6.315983672804569*^-7, 3]  max|dx| = ScientificForm[9.947609767220764*^-11, 3]
+  GN iter 15: |r| = ScientificForm[6.315983673427533*^-7, 3]  max|dx| = ScientificForm[1.351401913631258*^-10, 3]
+  GN iter 16: |r| = ScientificForm[6.315983675936101*^-7, 3]  max|dx| = ScientificForm[1.0485737764362512*^-10, 3]
+zone |x|<=6  (46 zeros):
+  B    mean|err| = ScientificForm[0.01914325315, 4]   max = ScientificForm[0.0551690806, 3]
+  fit  mean|err| = ScientificForm[0.002068588814058302, 4]   max = ScientificForm[0.009940258295953797, 3]   gain vs B = NumberForm[9.254257308122744, 4]x
+zone |x|<=3  (23 zeros):
+  B    mean|err| = ScientificForm[0.01825645966521739, 4]   max = ScientificForm[0.0397543185, 3]
+  fit  mean|err| = ScientificForm[0.002571495783034846, 4]   max = ScientificForm[0.009940258295953797, 3]   gain vs B = NumberForm[7.0995487473331, 4]x
+three-way on offsets 4995..5004:
+  B    mean|err| = ScientificForm[0.01756714799, 4]
+  boot mean|err| = ScientificForm[0.01058993703, 4]   (NumberForm[1.658852922376631, 4]x over B)
+  fit  mean|err| = ScientificForm[0.0020439559750951315, 4]   (NumberForm[8.594680220146316, 4]x over B, NumberForm[5.181098398906128, 4]x over boot)
+  per-zero |err| (B / boot / fit):
+   o=4995  ScientificForm[0.0397543185, 3]  ScientificForm[0.0074190485, 3]  ScientificForm[0.00041197263171421916, 3]
+   o=4996  ScientificForm[0.0223038464, 3]  ScientificForm[0.0042203364, 3]  ScientificForm[0.0015273339575178069, 3]
+   o=4997  ScientificForm[0.0228770948, 3]  ScientificForm[0.0063286348, 3]  ScientificForm[0.00010984410213921159, 3]
+   o=4998  ScientificForm[0.0144304411, 3]  ScientificForm[0.0119530611, 3]  ScientificForm[0.003734756556543928, 3]
+   o=4999  ScientificForm[0.0253033097, 3]  ScientificForm[0.0215332497, 3]  ScientificForm[0.004608707769775233, 3]
+   o=5000  ScientificForm[0.0219790929, 3]  ScientificForm[0.0235897929, 3]  ScientificForm[0.004965044259519481, 3]
+   o=5001  ScientificForm[0.0029177004, 3]  ScientificForm[0.0124761596, 3]  ScientificForm[0.0012708285725422097, 3]
+   o=5002  ScientificForm[0.0126395108, 3]  ScientificForm[0.0056553808, 3]  ScientificForm[0.0016882179944653908, 3]
+   o=5003  ScientificForm[0.0015390494, 3]  ScientificForm[0.0052996506, 3]  ScientificForm[0.0005809727225277728, 3]
+   o=5004  ScientificForm[0.0119271159, 3]  ScientificForm[0.0074240559, 3]  ScientificForm[0.001541881184206062, 3]
+=== k=200000 run (LM-damped) ===
+building prime tables, k=200000 X=2750159 a=14.8271692861531655616`6.
+prime powers: 200345
+B seeds: 4850..5150   boot baseline: 10 zeros
+fit zeros M=94  far fixed: 62  kappa = 3.806395976777217
+57 frequencies, 114 functionals
+  LM iter 1: |r| = ScientificForm[5.428659489518046, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[0.0003333333333333333, 2]
+  LM iter 2: |r| = ScientificForm[5.427841461549655, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[0.0001111111111111111, 2]
+  LM iter 3: |r| = ScientificForm[5.42658946220503, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[0.00003703703703703703, 2]
+  LM iter 4: |r| = ScientificForm[5.424318632747961, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[0.000012345679012345677, 2]
+  LM iter 5: |r| = ScientificForm[5.419945785891823, 3]  max|dx| = ScientificForm[0.07701529341137174, 3]  lam = ScientificForm[4.115226337448558*^-6, 2]
+  LM iter 6: |r| = ScientificForm[5.402569503453948, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.3717421124828526*^-6, 2]
+  LM iter 7: |r| = ScientificForm[5.378153805626237, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[4.572473708276175*^-7, 2]
+  LM iter 8: |r| = ScientificForm[5.331813356694036, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.524157902758725*^-7, 2]
+  LM iter 9: |r| = ScientificForm[5.10874075137335, 3]  max|dx| = ScientificForm[0.07701529341137171, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 10: |r| = ScientificForm[4.944950660476034, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 11: |r| = ScientificForm[4.74588205069736, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 12: |r| = ScientificForm[4.50841991722413, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 13: |r| = ScientificForm[4.243475084907054, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 14: |r| = ScientificForm[3.857596269343483, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 15: |r| = ScientificForm[3.5679478044607085, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 16: |r| = ScientificForm[3.318297136720519, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 17: |r| = ScientificForm[3.0794289737697564, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 18: |r| = ScientificForm[2.833825925407429, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 19: |r| = ScientificForm[2.44048159169972, 3]  max|dx| = ScientificForm[0.07701529341137174, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 20: |r| = ScientificForm[2.139537900002084, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 21: |r| = ScientificForm[1.8580282664527688, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 22: |r| = ScientificForm[1.0920875079980708, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 23: |r| = ScientificForm[0.7244096406849629, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+  LM iter 24: |r| = ScientificForm[0.44311385832180616, 3]  max|dx| = ScientificForm[0.07701529341137173, 3]  lam = ScientificForm[1.*^-7, 2]
+zone |x|<=6  (46 zeros):
+  B    mean|err| = ScientificForm[0.01914325315, 4]   max = ScientificForm[0.0551690806, 3]
+  fit  mean|err| = ScientificForm[0.001725688062129478, 4]   max = ScientificForm[0.007066771685523943, 3]   gain vs B = NumberForm[11.093113274700098, 4]x
+zone |x|<=3  (23 zeros):
+  B    mean|err| = ScientificForm[0.01825645966521739, 4]   max = ScientificForm[0.0397543185, 3]
+  fit  mean|err| = ScientificForm[0.0015968530187630379, 4]   max = ScientificForm[0.005775319253557898, 3]   gain vs B = NumberForm[11.432773994039414, 4]x
+three-way on offsets 4995..5004:
+  B    mean|err| = ScientificForm[0.01756714799, 4]
+  boot mean|err| = ScientificForm[0.01058993703, 4]   (NumberForm[1.658852922376631, 4]x over B)
+  fit  mean|err| = ScientificForm[0.0011944531517594646, 4]   (NumberForm[14.707272498819291, 4]x over B, NumberForm[8.86592916130759, 4]x over boot)
+  per-zero |err| (B / boot / fit):
+   o=4995  ScientificForm[0.0397543185, 3]  ScientificForm[0.0074190485, 3]  ScientificForm[0.0033187606206808162, 3]
+   o=4996  ScientificForm[0.0223038464, 3]  ScientificForm[0.0042203364, 3]  ScientificForm[0.0012476186921751564, 3]
+   o=4997  ScientificForm[0.0228770948, 3]  ScientificForm[0.0063286348, 3]  ScientificForm[0.0020016377043649003, 3]
+   o=4998  ScientificForm[0.0144304411, 3]  ScientificForm[0.0119530611, 3]  ScientificForm[0.000528165844252082, 3]
+   o=4999  ScientificForm[0.0253033097, 3]  ScientificForm[0.0215332497, 3]  ScientificForm[0.0014107246609585122, 3]
+   o=5000  ScientificForm[0.0219790929, 3]  ScientificForm[0.0235897929, 3]  ScientificForm[0.0009566573593971818, 3]
+   o=5001  ScientificForm[0.0029177004, 3]  ScientificForm[0.0124761596, 3]  ScientificForm[0.0001585783007253816, 3]
+   o=5002  ScientificForm[0.0126395108, 3]  ScientificForm[0.0056553808, 3]  ScientificForm[0.0006097176008081906, 3]
+   o=5003  ScientificForm[0.0015390494, 3]  ScientificForm[0.0052996506, 3]  ScientificForm[0.0004319009123036066, 3]
+   o=5004  ScientificForm[0.0119271159, 3]  ScientificForm[0.0074240559, 3]  ScientificForm[0.0012807698219288177, 3]

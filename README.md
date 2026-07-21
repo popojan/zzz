@@ -5,24 +5,134 @@ fast approximation of large Riemann zeta zeros on the critical line
 Usage: zzz [OPTION...] N [offset] [count]
 fast approximation of large Riemann zeta zeros
 
+  -k, --k=K                  use first k primes for the counting function [default 100]
+  -e, --evaluate             evaluate zeta at the approximate zero location
+  -G, --ghy                  use GHY partial Euler P_X (X = p_k) instead of damping
+  -B, --boot=W               self-consistent hybrid bootstrap: seed 2W+1 zeros, iterate
+                             leave-one-out P_X*Z_X relocation (implies --ghy)
+  -R, --rounds=R             bootstrap relocation rounds [default 2]
+  -S, --seeds=FILE           external seed zeros for --boot/--weil: odd count, target
+                             in the middle (use -R 0 to relocate the target only)
+  -W, --weil                 Weil explicit-formula window fit; needs gap*log(p_k) > pi
+                             (see doc/notes/band-saturation.md)
+  -L, --loop                 self-paving zeros<->primes bootstrap (zeta-free,
+                             primality-free): derive primes from zeros and zeros from
+                             primes; streams primes, auto-resumes, Ctrl+C-able
+                             (--resume, --loop-{batch,kmin,nmax,contrast,...}; --help)
   -d, --digits=DIGITS        extra digits for number formatting [default 6]
-  -e, --evaluate             evaluate Riemann zeta function value at the
-                             approximate zero location
-  -g, --debug                debug counting function from <N> to <N+offset> in
-                             <count> steps
-  -k, --k=K                  use first k primes for zero counting function
-                             approximation [default 100]
-  -p, --precision=PREC       arb precision for counting function approximation
-                             [default 256]
-  -t, --tolerance=TOL        tolerance for bisection [default 1e-6]
-  -v, --verbose              verbose progress output
-  -w, --window=WIN           initial span around Lambert W asymptotic zero
-                             location +- WIN [default 1.5]
+  -p, --precision=PREC       arb precision for the counting function [default 256]
   -z, --zeta-prec=ZETA_PREC  arb precision for zeta evaluation [default 64]
+  -t, --tolerance=TOL        tolerance for bisection [default 1e-6]
+  -w, --window=WIN           initial span +- WIN around the asymptotic location [def 1.5]
+  -v, --verbose              verbose progress output
+  -g, --debug                debug counting function from <N> to <N+offset> in <count>
   -?, --help                 Give this help list
-      --usage                Give a short usage message
   -V, --version              Print program version
 ```
+
+The `--ghy` flag swaps the heuristic damping for the Gonek–Hughes–Young
+partial Euler factor $P_X$, placing the counter inside a provable error
+chain (RH + GHY Thm 1 + Goldston 1987). Aux binaries `zproxy`, `zghy`,
+`zhad`, `zhybrid` dump the various inner factors on TSV grids. See
+[`doc/ghy.md`](doc/ghy.md) for the design and the rigor reference.
+
+## Self-consistent hybrid bootstrap (`--boot W`)
+
+`--boot W` makes the GHY hybrid $P_X \cdot Z_X$ **self-hosting**: it seeds
+$2W+1$ neighbouring zeros with the primes-only counter, then re-locates the
+inner core with a leave-one-out hybrid count (each zero excluded from its own
+$Z_X$), iterating to a fixed point. No zero tables are consumed; the chain
+stays zeta-evaluation-free.
+
+Validated against Odlyzko's tables (`doc/ghy/boot-validate.sh`, 20 zeros per
+height, `--boot 32`, mean |error| vs plain `--ghy` at the same k):
+
+| height | k | `--ghy` | `--boot 32` | gain |
+|---|---|---|---|---|
+| n ≈ 10³ | 1000 | 0.0153 | **0.0008** | **19×** |
+| n ≈ 10⁵ | 1000 | 0.0179 | 0.0064 | 2.8× |
+| 10¹² | 10⁴ | 0.0089 | 0.0044 | 2.0× |
+| 10²¹–10²² | 10⁴ | — | — | none |
+
+The gain switches off where $X \lesssim \sqrt{T/2\pi}$ (the Riemann–Siegel
+scale): below it the truncation deficit is coherent across neighbouring zeros
+and the self-computed seeds cannot see past it. Inside its domain the
+bootstrap reaches accuracies the $1/\log X$ law denies to $P_X$ at any
+feasible prime count. Derivation, stability analysis (guard ring, basin-hop
+rejection, the purely-imaginary-$E_1$ pitfall) and the validity threshold:
+[`doc/notes/bootstrap-hybrid.md`](doc/notes/bootstrap-hybrid.md).
+
+## Weil window fit (`--weil`)
+
+Above the same threshold, `--weil` extracts the band's surplus optimally:
+it seeds a window of consecutive zeros with $P_X$ at a reduced prime count
+(marching), then refines all of them in one least-squares fit against exact
+Riemann–Weil functionals of the primes — no kernel approximation, the full
+field instead of one crossing per zero. Validated against Odlyzko:
+
+| height | k | `--ghy` | `--boot 32` | `--weil` |
+|---|---|---|---|---|
+| n ≈ 10³ | 1000 | 0.0153 | 0.0008 | **0.00002** (in 2.8 s) |
+| 10¹² | 10⁵ | 0.0176 | 0.0106 | **0.0028** (10 zeros in 1.8 min) |
+
+```bash
+$ ./zzz --weil -k 1000 996 0 9        # nine zeros around #1000, one window
+1415.585795                            # true 1415.585784795
+...
+1419.422456                            # true 1419.422480946 (B: 1419.447701)
+```
+
+Combines with `-e` to evaluate $\zeta$ at each refined zero. Kernel in
+`weil.{c,h}`; theory and the validity regime in
+[`doc/notes/band-saturation.md`](doc/notes/band-saturation.md).
+
+Below that threshold nothing can beat plain `--ghy` from the same primes:
+crossing relocation, kernel ML, multi-cutoff ML and exact Weil-identity
+fitting all reproduce its errors, and a truth control shows the true zeros
+and the `--ghy`-displaced ones are indistinguishable to every band-limited
+functional of $p^m \le X$. The measured saturation principle, its
+consequences (the wall scales as $\sqrt{T/2\pi}$ — feasibility, not
+impossibility) and why the lowest-$k$ primes are the optimal selection:
+[`doc/notes/band-saturation.md`](doc/notes/band-saturation.md).
+
+```bash
+$ time ./zzz --boot 32 -k 1000 -d 8 1e12 +1  # zero #10^12+1, true 267653395648.8475231
+267653395648.84975665                        # |err| 0.0022 (--ghy alone: 0.0041)
+
+real    0m12.7s
+```
+
+## Self-paving prime ⇄ zero bootstrap (`--loop`)
+
+The explicit formula runs *both* ways: primes → zeros (what every counter above
+does) and zeros → primes (the Chebyshev $\psi'$ comb peaks at prime powers — the
+panel near the end of this README shows the reconstruction). `--loop` closes the
+loop and lets it run unattended: from a finite seed of zero ordinates it detects
+primes from the $\psi'$ signal, locates more zeros from a method-B sum over
+*those* primes, and repeats — with **no $\zeta$ evaluation and no primality
+test** in the loop body. The loop never confirms its own primes (that would
+defeat the purpose); checked *post-hoc* against a sieve they are all correct
+(0 false positives, none missed). It auto-resumes from a checkpoint and is
+Ctrl+C-able.
+
+```bash
+$ ./zzz --loop | head     # primes derived from zeros; Ctrl+C anytime, rerun to resume
+2                         # X_known climbs 54 -> 104 -> 314 -> 1125 -> ... (188 primes, all correct)
+3
+5
+...
+```
+
+It is a *demonstration* (plain method-B forward, double precision, modest
+heights): the prime bound grows super-critically for a finite stretch, gated by
+the band-saturation $\sqrt{T/2\pi}$ wall, not by precision. A fit-free
+local-contrast detector (`--loop-contrast`) drops even the empirical $\psi'$
+envelope. Mechanism, the contraction-map ceiling, the detector A/B and the
+seed-count limits: [`doc/notes/zeros-primes-bootstrap.md`](doc/notes/zeros-primes-bootstrap.md).
+
+**Live GPU demo.** The whole loop runs in-shader (fp32, 40-zero seed, no sieve,
+no ζ) on Shadertoy: <https://www.shadertoy.com/view/s3BSzD> — source and setup
+under [`doc/ghy/shadertoy/`](doc/ghy/shadertoy/).
 
 ## Zero counting function approximation
 
@@ -30,17 +140,17 @@ Note: obsolete inner sum approximation, not used any more.
 
 Combines quadratic and cubic spline with correct frequency and tangents to match the amplitude.
 
-![waves](doc/waves.png)
+![waves](doc/heuristic/waves.png)
 
 ## Towards convergence
 
-![waves](doc/convergence.png)
+![waves](doc/heuristic/convergence.png)
 
 ## Error distribution
 
 In comparison with k=-∞ (basic Lambert W approximation).
 
-![errors](doc/errors.png)
+![errors](doc/heuristic/errors.png)
 
 # Approximate n-th zero locations
 
@@ -65,15 +175,10 @@ sys     0m0.007s
 ## Zero # 10^36 + 42420637374017961984
 
 ```bash
-  $ time ./zzz -k 10000 1e36 42420637374017961984
-```
-
-```text
+$ time ./zzz -k 10000 1e36 42420637374017961984
 81029194732694548890047854481676713.009431
 
-real    0m2.381s
-user    0m2.366s
-sys     0m0.005s
+real    0m1.473s
 ```
 
 ```
@@ -83,13 +188,26 @@ sys     0m0.005s
 81029194732694548890047854481676713.08748   next approximate     #10^36+42420637374017961985
 ```
 
+```bash
+$ time ./zzz --ghy -k 10000 1e36 42420637374017961984
+81029194732694548890047854481676713.009348
+
+real    0m0.631s
+```
+
+At this height `--boot` is past its validity domain ($X = p_{10^4} \ll
+\sqrt{T/2\pi} \approx 10^{18}$): ensemble tests show no expected gain, and
+isolated improvements (e.g. `--boot 32` reaching …712.9936, error 0.0057)
+are fluctuations, not method. See
+[`doc/notes/bootstrap-hybrid.md`](doc/notes/bootstrap-hybrid.md).
+
 ## Chebyshev Psi Exact Formula
 
 Using zeros approximated by `zzz -k 1000`.
 
-range 0 to 20  (50 zeros)          |    range 541 to 661 (1,000 zeros)     | range 7920-8020 (10,000 zeros)  
-:---------------------------------:|:-------------------------------------:|:--------------------------------------:
-![](doc/psi-50-zeros-k1000-p1.png) | ![](doc/psi-10k-zeros-k1000-p100.png) | ![](doc/psi-10k-zeros-k1000-p1000.png)
+range 0 to 20  (50 zeros)                    |    range 541 to 661 (1,000 zeros)               | range 7920-8020 (10,000 zeros)
+:-------------------------------------------:|:-----------------------------------------------:|:------------------------------------------------:
+![](doc/heuristic/psi-50-zeros-k1000-p1.png) | ![](doc/heuristic/psi-10k-zeros-k1000-p100.png) | ![](doc/heuristic/psi-10k-zeros-k1000-p1000.png)
 
 
 # Literature
@@ -102,3 +220,7 @@ range 0 to 20  (50 zeros)          |    range 541 to 661 (1,000 zeros)     | ran
   * https://empslocal.ex.ac.uk/people/staff/mrwatkin/zeta/berry-keating1.pdf
 * Guilherme França, André LeClair: *Statistical and other properties of Riemann zeros based on an explicit equation for the n-th zero on the critical line*
   * https://arxiv.org/abs/1307.8395
+* Steven M. Gonek, Christopher P. Hughes, Matthew P. Young: *A hybrid Euler–Hadamard product for the Riemann zeta function*, Duke Math. J. **136** (2007), 507–549.
+  * https://arxiv.org/abs/math/0511092
+* Daniel A. Goldston: *On the function S(T) in the theory of the Riemann zeta-function*, J. Number Theory **27** (1987), 149–177.
+  * https://doi.org/10.1016/0022-314X(87)90061-4
