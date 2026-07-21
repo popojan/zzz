@@ -27,6 +27,7 @@ typedef struct {
     int contrast;            // use the fit-free local-contrast detector (no Li)
     long batch;              // zeros per re-detect (smooth streaming) [2000; 0=all]
     int fresh;               // force a fresh start, ignoring any checkpoint
+    double boxc;             // forward box-smoothing window w = boxc*gap(t) [0.375; 0 = plain B]
     int verbose;
 } loop_opts;
 

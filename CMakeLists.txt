@@ -5,9 +5,12 @@ set(CMAKE_C_STANDARD 11)
 
 set(CMAKE_C_FLAGS "-O3 -funroll-loops")
 
-set(CMAKE_LIB)
-
 option(STATIC_LINKING "static linking dependencies" OFF)
+
+# All zeta-zero sources live under src/ (psi.c / pellreg*.c in the tree root are
+# unrelated and not built here).
+set(ZZZ_SRC ${PROJECT_SOURCE_DIR}/src)
+include_directories(${ZZZ_SRC})
 
 IF(STATIC_LINKING)
     include_directories(${PROJECT_SOURCE_DIR}/deps/)
@@ -33,14 +36,20 @@ ELSE()
     link_libraries(gmp flint mpfr)
 ENDIF()
 
-add_library(ghy STATIC ghy.c weil.c loop.c)
+add_library(ghy STATIC ${ZZZ_SRC}/ghy.c ${ZZZ_SRC}/weil.c ${ZZZ_SRC}/loop.c)
 
-add_executable(zzz main.c)
-add_executable(zproxy zproxy.c)
-add_executable(zghy zghy.c)
-add_executable(zhad zhad.c)
-add_executable(zhybrid zhybrid.c)
-target_link_libraries(zzz ghy m)
-target_link_libraries(zghy ghy m)
-target_link_libraries(zhad ghy m)
+add_executable(zzz     ${ZZZ_SRC}/main.c)
+add_executable(zproxy  ${ZZZ_SRC}/zproxy.c)
+add_executable(zghy    ${ZZZ_SRC}/zghy.c)
+add_executable(zhad    ${ZZZ_SRC}/zhad.c)
+add_executable(zhybrid ${ZZZ_SRC}/zhybrid.c)
+target_link_libraries(zzz     ghy m)
+target_link_libraries(zghy    ghy m)
+target_link_libraries(zhad    ghy m)
 target_link_libraries(zhybrid ghy m)
+
+# ---- experimental: Vulkan-accelerated batch method-B (opt-in) --------------
+option(BUILD_VULKAN "build the experimental Vulkan batch method-B tool (zvk)" OFF)
+if(BUILD_VULKAN)
+    add_subdirectory(src/vulkan)
+endif()

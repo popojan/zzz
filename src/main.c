@@ -1199,6 +1199,7 @@ static struct argp_option options[] = {
         { "loop-contrast", 1008, 0, 0, "--loop: fit-free local-contrast detector (no Li envelope; warm-starts with 10 primes)"},
         { "loop-fresh", 1009, 0, 0, "--loop: force a fresh start, ignoring any existing checkpoint"},
         { "loop-batch", 1010, "N", 0, "--loop: zeros per re-detect for smooth streaming [2000; 0=whole frontier]"},
+        { "loop-boxc", 1011, "C", 0, "--loop: forward box-smoothing window w = C*gap(t) [0.375; 0 = plain B]"},
         { 0 }
 };
 
@@ -1228,6 +1229,7 @@ struct arguments {
     slong loop_contrast;
     slong loop_fresh;
     slong loop_batch;
+    double loop_boxc;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -1259,6 +1261,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 1008: arguments->loop_contrast = 1; break;
         case 1009: arguments->loop_fresh = 1; break;
         case 1010: arguments->loop_batch = atol(arg); break;
+        case 1011: arguments->loop_boxc = atof(arg); break;
         case ARGP_KEY_ARG: return 0;
         default: return ARGP_ERR_UNKNOWN;
     }
@@ -1319,6 +1322,7 @@ int main(int argc, char *argv[])
     arguments.loop_contrast = 0;
     arguments.loop_fresh = 0;
     arguments.loop_batch = -1;
+    arguments.loop_boxc = -1.0;
 
     int arg_index = 1;
     argp_parse(&argp, argc, argv, ARGP_NO_ARGS, &arg_index, &arguments);
@@ -1337,6 +1341,7 @@ int main(int argc, char *argv[])
         lo.contrast = arguments.loop_contrast;
         lo.fresh = arguments.loop_fresh;
         if (arguments.loop_batch >= 0) lo.batch = arguments.loop_batch;
+        if (arguments.loop_boxc >= 0.0) lo.boxc = arguments.loop_boxc;
         lo.verbose = arguments.verbose;
         return loop_run(&lo);
     }

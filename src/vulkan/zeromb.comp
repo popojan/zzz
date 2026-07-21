@@ -1,0 +1,81 @@
+#version 450
+// zeromb.comp -- batch method-B zero refinement, window-relative, df32.
+//
+// Axis A x B: ONE WORKGROUP PER ZERO; the workgroup's threads cooperatively
+// reduce the O(P) prime sum (so a single zero with large -k gets real GPU
+// parallelism, not one serial lane).  The root-find is the same verified
+// bisection as the baseline -- driven identically by every thread off the
+// shared reduction result, so the answer matches the thread-per-zero kernel.
+//
+// F_B(t_base+d) = N0(t_base+d) + (1/pi) Im log P_X,
+//   Im log P_X = -sum_k amp[k] sin(phi[k] + om[k]*d).
+// Host folds (m log p . t_base) mod 2pi in ARB; here phi in [0,2pi), om=m log p,
+// amp=1/(m p^{m/2}), d~gap.  sin arg range-reduced; sum in df32 (two-float).
+
+layout(local_size_x = 256) in;
+const uint WG = 256u;
+
+layout(std430, binding = 0) readonly  buffer Phi { float phi[]; };
+layout(std430, binding = 1) readonly  buffer Amp { float amp[]; };
+layout(std430, binding = 2) readonly  buffer Om  { float om[];  };
+layout(std430, binding = 3) writeonly buffer Out { float delta[]; };
+
+layout(push_constant) uniform PC {
+    uint  P;     uint  M;     int   Wc;
+    float rho;   float rho1;  float c0;   float gap;
+} pc;
+
+const float INV_PI     = 0.318309886183790672;
+const float TWO_PI     = 6.283185307179586477;
+const float INV_TWO_PI = 0.159154943091895336;
+
+shared vec2  red[WG];   // df32 partials
+shared float gval;      // broadcast F_B(d)
+
+vec2 twoSum(float a, float b) { float s = a + b; float z = s - a; return vec2(s, (a - (s - z)) + (b - z)); }
+vec2 dfAdd(vec2 a, float c)   { vec2 s = twoSum(a.x, c);     return twoSum(s.x, s.y + a.y); }       // df32 + float
+vec2 dfAddDf(vec2 a, vec2 b)  { vec2 s = twoSum(a.x, b.x);   return twoSum(s.x, s.y + a.y + b.y); }  // df32 + df32
+
+// cooperative F_B(t_base + d) - target(dn); every thread returns the same value.
+float gcoop(float d, int dn, uint lid) {
+    vec2 S = vec2(0.0, 0.0);
+    for (uint k = lid; k < pc.P; k += WG) {           // strided slice of primes
+        float a = phi[k] + om[k] * d;
+        a -= TWO_PI * floor(a * INV_TWO_PI);
+        S = dfAdd(S, amp[k] * sin(a));
+    }
+    red[lid] = S;
+    barrier();
+    for (uint s = WG / 2u; s > 0u; s >>= 1) {          // df32 tree reduction
+        if (lid < s) red[lid] = dfAddDf(red[lid], red[lid + s]);
+        barrier();
+    }
+    if (lid == 0u) {
+        float sm = pc.c0 + pc.rho * d + 0.5 * pc.rho1 * d * d - float(dn);
+        gval = sm - INV_PI * (red[0].x + red[0].y);
+    }
+    barrier();
+    return gval;
+}
+
+void main() {
+    uint i = gl_WorkGroupID.x;        // one workgroup per zero (uniform across the WG)
+    if (i >= pc.M) return;
+    uint lid = gl_LocalInvocationID.x;
+    int  dn  = int(i) - pc.Wc;
+    float d0 = float(dn) * pc.gap;
+    float lo = d0 - 0.9 * pc.gap, hi = d0 + 0.9 * pc.gap;
+    float glo = gcoop(lo, dn, lid);
+    float ghi = gcoop(hi, dn, lid);
+    if ((glo > 0.0) == (ghi > 0.0)) {                  // widen once
+        lo = d0 - 1.8 * pc.gap; hi = d0 + 1.8 * pc.gap;
+        glo = gcoop(lo, dn, lid); ghi = gcoop(hi, dn, lid);
+    }
+    if ((glo > 0.0) == (ghi > 0.0)) { if (lid == 0u) delta[i] = d0; return; }  // fallback (uniform)
+    for (int it = 0; it < 40; ++it) {                  // bisection (every thread, identical)
+        float mid = 0.5 * (lo + hi);
+        float gm  = gcoop(mid, dn, lid);
+        if ((glo > 0.0) == (gm > 0.0)) { lo = mid; glo = gm; } else { hi = mid; }
+    }
+    if (lid == 0u) delta[i] = 0.5 * (lo + hi);
+}

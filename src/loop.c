@@ -126,8 +126,21 @@ static double N0(double t) {
     double u = t / (2.0 * M_PI);
     return u * log(u / M_E) + 0.875;
 }
+// forward box-smoothing coefficient (loop_opts.boxc): w = g_boxc * gap(t); 0 = plain B
+static double g_boxc = 0.0;
 // F_B(t) = N0(t) + Im log P_X / pi,  Im log P_X = -sum_{p^m<=X} (1/m) p^{-m/2} sin(m t log p)
+// With g_boxc > 0 each term carries sinc(m*w*log p): that is exactly the box average
+// (1/2w) int_{t-w}^{t+w} F_B dx.  The box average of the TRUE staircase still crosses
+// k-1/2 at gamma_k when the window holds one zero, so the bisection target is unchanged;
+// the weight only damps the noisy top of the prime band.  Gate-checked 2.5-3.5x location
+// gain for kappa = gap*log X in (1.5pi, 3pi) -- the loop's operating band -- and null at
+// kappa <= pi, consistent with doc/notes/band-saturation.md (in-band functional).
 static double FB(double t, const state *st, long X) {
+    double w = 0.0;
+    if (g_boxc > 0.0) {
+        double u = t / (2.0 * M_PI);
+        if (u > 1.5) w = g_boxc * 2.0 * M_PI / log(u);
+    }
     double acc = 0.0;
     for (long i = 0; i < st->np; ++i) {
         long p = st->p[i];
@@ -135,7 +148,9 @@ static double FB(double t, const state *st, long X) {
         double lp = log((double)p), pm = (double)p, half = 1.0;
         for (long m = 1; ; ++m) {
             half = pow((double)p, -0.5 * m);
-            acc += (half / m) * sin(m * t * lp);
+            double term = (half / m) * sin(m * t * lp);
+            if (w > 0.0) { double a = m * w * lp; term *= sin(a) / a; }
+            acc += term;
             if (pm > (double)X / p) break;
             pm *= p;
         }
@@ -160,22 +175,72 @@ static double locate_march(long k, const state *st, long X, double prev) {
 }
 
 // backward: scan x from x_start upward (primes below x_start already known),
-// detect prime powers from the psi' peak, append new primes; conservative stop
-// at the first ambiguous non-(known-power). Returns the reach X_known.
+// detect prime powers from the psi' peak, append new primes. Returns X_known.
+//
+// A SINGLE-NZ reading of r has Dirichlet-sidelobe variance: r(x) oscillates with
+// gamma_max, so near the reach edge a prime can dip into a null (a miss) and a
+// prime-adjacent composite can ride a sidelobe above threshold (a false positive).
+// This is NOT a fundamental wall -- the signal is stable across NZ.  So (mirroring
+// src/vulkan/loopvk) evaluate r at K=6 NZ-truncations (gamma_max 0.5x..1x) and take
+// the MEDIAN per candidate; the truncations are PREFIX SUMS of the same cos series,
+// so one pass over the zeros yields all K (no extra cost).  The frontier advances
+// STRICTLY CONTIGUOUSLY -- it stops at the first unresolved candidate and never
+// leapfrogs one (a skipped prime would be a permanent miss that then corrupts the
+// forward step's zeros).  The committed frontier lags to ~reach(0.5*NZ), so commits
+// happen well inside the reach where the median is bimodal-clean (~0.66 vs ~0.03).
 static long backward(state *st, long x_start, long Xcap) {
-    long n = st->nz, Xk = x_start - 1;
-    for (long x = x_start; x <= Xcap; ++x) {
-        double r = psi_prime((double)x, st->z, n) / envelope((double)x, n);
-        int kp = is_known_pow(x, st);
-        if (r > TAU) {                                     // clear prime power
-            if (!kp && !p_has(st, x)) { p_push(st, x); printf("%ld\n", x); fflush(stdout); }
-            Xk = x;
-        } else if (r > TAULO) {
-            if (kp) { Xk = x; } else break;                // ambiguous non-power -> stop
-        } else {
-            Xk = x;                                        // clear composite
+    const long   GW = 30;            // reach-gate neighbourhood half-width
+    const double FRAC_OK = 0.70;     // clear-composite fraction (lowest truncation) => inside reach
+    const long   X_GATE = 512;       // gate above this; conservative bootstrap below
+    const double TAU_C = 0.40, TAU_LO_M = 0.25;   // median commit / clear-composite thresholds
+    enum { K = 6 };
+    static const double FR[K] = { 0.50, 0.60, 0.70, 0.80, 0.90, 1.00 };
+    long nz = st->nz;
+    if (x_start < 2) x_start = 2;
+    long s0 = x_start - GW; if (s0 < 2) s0 = 2;
+    long s1 = Xcap + GW, NX = s1 - s0 + 1;
+    if (NX < 1) return st->Xknown;
+    long nb[K]; double LiK[K];                            // truncation sizes and Li(n-4) factors
+    for (int b = 0; b < K; ++b) { nb[b] = (b == K-1) ? nz : (long)floor(FR[b] * (double)nz);
+        if (nb[b] < 6) nb[b] = (nz < 6 ? nz : 6); LiK[b] = ENVK * li((double)nb[b] - 4.0); }
+    double *R = malloc((size_t)NX * K * sizeof(double));  // r at each truncation per candidate
+    for (long i = 0; i < NX; ++i) {                       // prefix sum: all K truncations in one pass
+        double x = (double)(s0 + i), lx = log(x), s = 0.0;
+        double base = 1.0 + 1.0 / (x - x*x*x), c4 = 4.0 / sqrt(x);
+        long prev = 0;
+        for (int b = 0; b < K; ++b) {
+            for (long k = prev; k < nb[b]; ++k) s += cos(st->z[k] * lx);
+            R[i*K + b] = (base - c4 * s) / (LiK[b] * lx / x);
+            prev = nb[b];
         }
     }
+#define RAT(X,B) (((X) < s0 || (X) > s1) ? 0.0 : R[((X) - s0)*K + (B)])
+    long Xk = x_start - 1;
+    for (long x = x_start; x <= Xcap; ++x) {
+        int kp = is_known_pow(x, st), resolved;
+        if (x < X_GATE) {                                // bootstrap: conservative three-zone (full NZ)
+            double rx = RAT(x, K-1);
+            if (rx > TAU)        { if (!kp && !p_has(st, x)) { p_push(st, x); printf("%ld\n", x); fflush(stdout); } resolved = 1; }
+            else if (rx > TAULO) resolved = kp;          // ambiguous: resolved only if known power
+            else                 resolved = 1;           // clear composite
+        } else {
+            long cnt = 0, tot = 0;                       // reach frac from the lowest truncation
+            for (long j = x - GW; j <= x + GW; ++j) { if (j < 2) continue; ++tot; if (RAT(j, 0) < TAULO) ++cnt; }
+            if (!tot || (double)cnt / (double)tot < FRAC_OK) {
+                resolved = 0;                            // beyond reach(0.5*NZ) -> stop
+            } else {
+                double v[K]; for (int b = 0; b < K; ++b) v[b] = RAT(x, b);
+                qsort(v, K, sizeof(double), cmp_d);
+                double m = 0.5 * (v[K/2 - 1] + v[K/2]);   // median over the K truncations
+                if (m > TAU_C)         { if (!kp && !p_has(st, x)) { p_push(st, x); printf("%ld\n", x); fflush(stdout); } resolved = 1; }
+                else if (m < TAU_LO_M) resolved = 1;     // clear composite
+                else                   resolved = (kp || p_has(st, x));   // ambiguous -> only if known
+            }
+        }
+        if (resolved) Xk = x; else break;                // contiguous: stop at first unresolved
+    }
+#undef RAT
+    free(R);
     return Xk;
 }
 
@@ -272,6 +337,7 @@ void loop_opts_default(loop_opts *o) {
     o->contrast = 0;
     o->batch = 2000;
     o->fresh = 0;
+    o->boxc = 0.375;
     o->verbose = 0;
 }
 
@@ -283,6 +349,7 @@ static int file_exists(const char *path) {
 
 int loop_run(const loop_opts *o) {
     state st; memset(&st, 0, sizeof st);
+    g_boxc = o->boxc;
 
     // auto-resume: bare --loop continues from a checkpoint if one is present.
     int resume = o->fresh ? 0 : (o->resume ? 1 : file_exists(o->state_path));
@@ -344,8 +411,10 @@ int loop_run(const loop_opts *o) {
                 // fixed point at this kmin: anneal the margin down and keep climbing
                 no_improve = (st.Xknown >= best_X) ? 0 : no_improve + 1;
                 if (!o->anneal || st.kmin <= o->kmin_floor + 1e-9 || no_improve >= 2) {
-                    fprintf(stderr, "loop: plain-B ceiling reached -- X*=%ld at kmin=%.3f "
-                            "(go further with a sharper/Weil forward step)\n", best_X, st.kmin);
+                    fprintf(stderr, "loop: %s ceiling reached -- X*=%ld at kmin=%.3f "
+                            "(go further with a %s forward step)\n",
+                            g_boxc > 0.0 ? "box-B" : "plain-B", best_X, st.kmin,
+                            g_boxc > 0.0 ? "Weil" : "box-B/Weil");
                     break;
                 }
                 st.kmin *= 0.9;
