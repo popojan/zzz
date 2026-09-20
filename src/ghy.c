@@ -100,7 +100,7 @@ void ghy_log_zx(acb_ptr out,
     acb_t total, rho, diff, arg_z, kernel, log_X_c;
     arb_t half, log_X, t_arb, gamma_arb;
     double log_X_d = log((double)X);
-    double t_d = arf_get_d(arb_midref(acb_imagref(s)), ARF_RND_NEAR);
+    double t_d;
 
     acb_init(total);
     acb_init(rho);
@@ -114,6 +114,11 @@ void ghy_log_zx(acb_ptr out,
     arb_init(gamma_arb);
 
     acb_zero(total);
+
+    // t_d via a local copy: taking arb_midref(acb_imagref(s)) off the const
+    // parameter trips a gcc 16 -Wstringop-overread false positive downstream.
+    arb_set(t_arb, acb_imagref(s));
+    t_d = arf_get_d(arb_midref(t_arb), ARF_RND_NEAR);
 
     arb_set_d(half, 0.5);
     arb_set_ui(log_X, X);
