@@ -90,7 +90,9 @@ static int p_has(long x) {
 }
 static int is_known_pow(long x) {
     for (long p : primes) { if (p * p > x) break; long q = p * p;
-        while (q < x) q *= p; if (q == x) return 1; } return 0;
+        while (q < x) q *= p;
+        if (q == x) return 1; }
+    return 0;
 }
 
 static volatile sig_atomic_t g_stop = 0;
@@ -264,7 +266,8 @@ int main(int argc, char **argv) {
         for (long p : primes) { if (p > Xknown) break; double lp = log((double)p);
             long q = p, m = 1; for (;;) { ampD.push_back((float)(1.0 / (m * pow((double)p, 0.5 * m))));
                 omD.push_back((float)((double)m * lp)); mlpd.push_back((double)m * lp);
-                if (q > Xknown / p) break; q *= p; ++m; } }
+                if (q > Xknown / p) break;
+                q *= p; ++m; } }
         uint32_t P = (uint32_t)ampD.size(); if (P == 0) return;
         auto tAmp = mgr.tensor(ampD); auto tOm = mgr.tensor(omD);
         std::vector<float> phiD(P);
