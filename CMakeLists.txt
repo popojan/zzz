@@ -53,6 +53,14 @@ foreach(_t ghy zzz zproxy zghy zhad zhybrid)
     target_compile_options(${_t} PRIVATE -funroll-loops -Wall -Wextra -Wno-missing-field-initializers)
 endforeach()
 
+# ---- smoke tests: `ctest --test-dir build` (~6 s) --------------------------
+enable_testing()
+foreach(_case zero1 ghy boot weil grids)
+    add_test(NAME smoke.${_case}
+             COMMAND sh ${PROJECT_SOURCE_DIR}/tests/smoke.sh ${_case}
+                     $<TARGET_FILE_DIR:zzz> ${PROJECT_SOURCE_DIR}/doc/ghy/first-20-zeros.txt)
+endforeach()
+
 # ---- experimental: Vulkan-accelerated batch method-B (opt-in) --------------
 option(BUILD_VULKAN "build the experimental Vulkan batch method-B tool (zvk)" OFF)
 if(BUILD_VULKAN)
