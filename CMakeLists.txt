@@ -1,40 +1,39 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 project(zzz C)
 
 set(CMAKE_C_STANDARD 11)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Release (default), Debug, RelWithDebInfo" FORCE)
+endif()
 
-set(CMAKE_C_FLAGS "-O3 -funroll-loops")
-
-option(STATIC_LINKING "static linking dependencies" OFF)
+option(STATIC_LINKING "link FLINT/MPFR/GMP as static archives from ZZZ_DEPS_PREFIX (see deps/README.md)" OFF)
+set(ZZZ_DEPS_PREFIX "${PROJECT_SOURCE_DIR}/deps/local" CACHE PATH
+    "install prefix holding include/{flint,gmp.h,mpfr.h} and lib/lib{flint,mpfr,gmp}.a")
 
 # All zeta-zero sources live under src/ (psi.c / pellreg*.c in the tree root are
 # unrelated and not built here).
 set(ZZZ_SRC ${PROJECT_SOURCE_DIR}/src)
 include_directories(${ZZZ_SRC})
 
-IF(STATIC_LINKING)
-    include_directories(${PROJECT_SOURCE_DIR}/deps/)
-
-    link_directories(
-        ${PROJECT_SOURCE_DIR}/deps/gmp-6.2.1/.libs
-        ${PROJECT_SOURCE_DIR}/deps/flint-2.9.0
-        ${PROJECT_SOURCE_DIR}/deps/mpfr-4.2.0/src/.libs
-        ${PROJECT_SOURCE_DIR}/deps/arb
-    )
-
-    link_libraries(
-        m
-        libarb.a
-        libflint.a
-        libmpfr.a
-        libgmp.a
-    )
-ELSE()
-    find_library(GMP gmp)
+# FLINT >= 3 (arb is part of it); GMP and MPFR underneath.
+if(STATIC_LINKING)
+    include_directories(${ZZZ_DEPS_PREFIX}/include)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+    set(_zzz_libdirs ${ZZZ_DEPS_PREFIX}/lib ${ZZZ_DEPS_PREFIX}/lib64)
+    find_library(FLINT flint PATHS ${_zzz_libdirs} NO_DEFAULT_PATH)
+    find_library(MPFR  mpfr  PATHS ${_zzz_libdirs} NO_DEFAULT_PATH)
+    find_library(GMP   gmp   PATHS ${_zzz_libdirs} NO_DEFAULT_PATH)
+else()
     find_library(FLINT flint)
-    find_library(MPFR mpfr)
-    link_libraries(gmp flint mpfr)
-ENDIF()
+    find_library(MPFR  mpfr)
+    find_library(GMP   gmp)
+endif()
+foreach(_lib FLINT MPFR GMP)
+    if(NOT ${_lib})
+        message(FATAL_ERROR "${_lib} not found (STATIC_LINKING=${STATIC_LINKING}, ZZZ_DEPS_PREFIX=${ZZZ_DEPS_PREFIX}); see deps/README.md")
+    endif()
+endforeach()
+set(ZZZ_LIBS ${FLINT} ${MPFR} ${GMP} m)   # dependency order matters for static archives
 
 add_library(ghy STATIC ${ZZZ_SRC}/ghy.c ${ZZZ_SRC}/weil.c ${ZZZ_SRC}/loop.c)
 
@@ -43,10 +42,16 @@ add_executable(zproxy  ${ZZZ_SRC}/zproxy.c)
 add_executable(zghy    ${ZZZ_SRC}/zghy.c)
 add_executable(zhad    ${ZZZ_SRC}/zhad.c)
 add_executable(zhybrid ${ZZZ_SRC}/zhybrid.c)
-target_link_libraries(zzz     ghy m)
-target_link_libraries(zghy    ghy m)
-target_link_libraries(zhad    ghy m)
-target_link_libraries(zhybrid ghy m)
+target_link_libraries(ghy PUBLIC ${ZZZ_LIBS})
+target_link_libraries(zproxy ${ZZZ_LIBS})
+foreach(_t zzz zghy zhad zhybrid)
+    target_link_libraries(${_t} ghy)
+endforeach()
+
+# -Wno-missing-field-initializers: the argp option table relies on trailing zeros
+foreach(_t ghy zzz zproxy zghy zhad zhybrid)
+    target_compile_options(${_t} PRIVATE -funroll-loops -Wall -Wextra -Wno-missing-field-initializers)
+endforeach()
 
 # ---- experimental: Vulkan-accelerated batch method-B (opt-in) --------------
 option(BUILD_VULKAN "build the experimental Vulkan batch method-B tool (zvk)" OFF)
