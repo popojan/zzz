@@ -63,7 +63,8 @@ static void z_push(state *st, double v) {
 static int  p_has(const state *st, long x) {     // membership (ascending list)
     long lo = 0, hi = st->np - 1;
     while (lo <= hi) { long m = (lo + hi) / 2;
-        if (st->p[m] == x) return 1; if (st->p[m] < x) lo = m + 1; else hi = m - 1; }
+        if (st->p[m] == x) return 1;
+        if (st->p[m] < x) lo = m + 1; else hi = m - 1; }
     return 0;
 }
 static void p_push(state *st, long x) {           // append (x larger than all)
@@ -84,7 +85,6 @@ static double ei(double zz) {                     // exponential integral, zz>0
     return s;
 }
 static double li(double x) { return ei(log(x)); }                 // Li(x)=Ei(ln x)
-static double envelope(double x, long n) { return ENVK * li((double)n - 4.0) * log(x) / x; }
 
 // psi'(x) ~ 1 + 1/(x-x^3) - (4/sqrt x) sum_k cos(gamma_k log x)
 static double psi_prime(double x, const double *z, long n) {
@@ -202,7 +202,8 @@ static long backward(state *st, long x_start, long Xcap) {
     if (NX < 1) return st->Xknown;
     long nb[K]; double LiK[K];                            // truncation sizes and Li(n-4) factors
     for (int b = 0; b < K; ++b) { nb[b] = (b == K-1) ? nz : (long)floor(FR[b] * (double)nz);
-        if (nb[b] < 6) nb[b] = (nz < 6 ? nz : 6); LiK[b] = ENVK * li((double)nb[b] - 4.0); }
+        if (nb[b] < 6) nb[b] = (nz < 6 ? nz : 6);
+        LiK[b] = ENVK * li((double)nb[b] - 4.0); }
     double *R = malloc((size_t)NX * K * sizeof(double));  // r at each truncation per candidate
     for (long i = 0; i < NX; ++i) {                       // prefix sum: all K truncations in one pass
         double x = (double)(s0 + i), lx = log(x), s = 0.0;
