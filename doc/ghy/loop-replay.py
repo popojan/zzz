@@ -5,13 +5,14 @@ The statistic the loop thresholds is modelled, per truncation b, as
 
     r_b(x) = A_b * ( -1 + 2 (u_b/pi) C  sum_n Lambda(n) sinc(u_b (x - n)) ) + jitter,
 
-u_b = gamma(FR_b * NZ) / x, A_b = x / (5 Li(n_b) ln x): the explicit-formula peak of each
+u_b = gamma(FR_b * NZ) / x, A_b = pi / (2 u_b ln x): the explicit-formula peak of each
 prime, smeared by the hard truncation of the zero sum, at coherence C (how strongly the
 loop's zeros carry a prime that was not in the forward sum yet; ~0.90 box-B, ~0.72
 plain-B), plus prefix-sum noise of variance c / (a_b ln x).  The primes are the real ones
 around x0 (segmented sieve), so twin primes and denser clusters appear with their true
 frequency.  Against the loop's own decision log the model reproduces the per-truncation
-composite readings with correlation ~0.8 and the residual gives c ~ 0.021.
+composite readings with correlation ~0.8 and the residual gives c ~ 0.021.  (In these units
+a prime reads C - 1/(4 a_b ln x) and an isolated composite -1/(4 a_b ln x).)
 
 For each lag a = gamma_top / (2 pi x) the table shows how often the statistical reach gate
 passes, and what the median rule would then decide.  The point: false primes (composites
@@ -28,7 +29,6 @@ import sys
 
 import numpy as np
 from scipy.signal import fftconvolve
-from scipy.special import expi
 
 FR = [.5, .6, .7, .8, .9, 1.0]
 LAGS = [1.3, 1.1, 1.0, 0.9, 0.8, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4]
@@ -98,7 +98,7 @@ def main():
         walk, prevT = np.zeros(L), 0.0
         for b in range(6):
             u = Tb[b] / x0
-            A = x0 / (5 * expi(math.log(FR[b] * N - 4.0)) * lx)
+            A = math.pi / (2 * u * lx)                       # loop.c's scale (2 gamma/pi) ln x / x
             conv = fftconvolve(lam, np.sinc(u * dd / math.pi), mode="valid")
             walk = walk + math.sqrt(Tb[b] - prevT) * rng.standard_normal(L)      # prefix sums share noise
             prevT = Tb[b]
