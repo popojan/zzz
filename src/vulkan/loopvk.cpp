@@ -46,7 +46,7 @@ static const double SEED[] = {
 };
 #define NSEED ((long)(sizeof(SEED)/sizeof(SEED[0])))
 
-static const double TAU = 0.30, TAULO = 0.12, ENVK = 20.0 / 4.0;
+static const double TAULO = 0.12, ENVK = 20.0 / 4.0;
 
 struct PCfwd { uint32_t P, M; int32_t Wc; float rho, rho1, c0, gap; };
 struct PCbwd { uint32_t NZ, X0, NX, KB; };   // KB prefix-sum truncations emitted per candidate
@@ -179,11 +179,12 @@ int main(int argc, char **argv) {
     // The frontier is gated on the LOWEST truncation's reach (its clear-composite fraction
     // >= FRAC_OK), so every truncation actually resolves the candidate (no beyond-reach
     // reading pollutes the median); this lags the committed frontier to ~reach(0.5*NZ).
-    // Below X_GATE -> conservative three-zone bootstrap on the full-NZ reading.
+    // U_MIN states the same requirement outright and is the only reach limit below X_GATE.
     const long   GW = 30;            // reach-gate neighbourhood half-width
     const double FRAC_OK = 0.70;     // clear-composite fraction (lowest truncation): lag inside reach
                                      // so the 0.5*NZ reading is clean (contiguity guards correctness)
-    const long   X_GATE = 512;       // gate applies above this; conservative bootstrap below
+    const long   X_GATE = 512;       // statistical gate above this (below, the window is power-dense)
+    const double U_MIN = 2.5;        // lag floor: commit x only while gamma(0.5*NZ) >= U_MIN*x (loop.c)
     const double TAU_C = 0.40;       // commit threshold (median-r is bimodal-clean: ~0.03 vs ~0.66)
     const double TAU_LO_M = 0.25;    // clear-composite median (below it advance; in [.,TAU_C] wait)
     const int    K = 6;              // NZ truncations medianed (FR[k]=0.5+0.1k, matches psi.comp)
@@ -225,35 +226,32 @@ int main(int argc, char **argv) {
             double v[K]; for (int k = 0; k < K; ++k) v[k] = rk(x, k);
             std::sort(v, v + K); return 0.5 * (v[K/2 - 1] + v[K/2]); };
         auto Rlow  = [&](long x) -> double { return rk(x, 0);   };   // 0.5*NZ truncation (deep reach gate)
-        auto Rfull = [&](long x) -> double { return rk(x, K-1); };   // full NZ (bootstrap)
         auto commit = [&](long x) {
             long lo = 0, hi = (long)primes.size();
             while (lo < hi) { long m = (lo + hi) / 2; if (primes[m] < x) lo = m + 1; else hi = m; }
             primes.insert(primes.begin() + lo, x);
             printf("%ld\n", x); fflush(stdout); };
         // CONTIGUOUS frontier: advance only through resolved candidates, and STOP at the
-        // first unresolved one -- never leapfrog (a skipped prime would be a permanent miss
-        // that then corrupts the forward step's zeros).
+        // first unresolved one -- never leapfrog (a skipped prime would be a permanent miss;
+        // nothing downstream notices or repairs a wrong list).
         long lastHealthy = x0 - 1;
         for (long x = x0; x <= Xcap; ++x) {
             int kp = is_known_pow(x);
             bool resolved;
-            if (x < X_GATE) {                                // bootstrap: conservative three-zone (full NZ)
-                double rx = Rfull(x);
-                if (rx > TAU)        { if (!kp && !p_has(x)) commit(x); resolved = true; }   // prime power
-                else if (rx > TAULO) resolved = kp;          // ambiguous: resolved only if known power
-                else                 resolved = true;        // clear composite
-            } else {
+            // same rule as loop.c::backward: lag floor at every x, statistical gate above X_GATE
+            bool inreach = z[(size_t)NZb[0] - 1] >= U_MIN * (double)x;
+            if (inreach && x >= X_GATE) {
                 long cnt = 0, tot = 0;                       // reach frac from the LOWEST truncation
                 for (long j = x - GW; j <= x + GW; ++j) { if (j < 2) continue; ++tot; if (Rlow(j) < TAULO) ++cnt; }
-                if (!tot || (double)cnt / (double)tot < FRAC_OK) {
-                    resolved = false;                        // beyond reach(0.5*NZ) -> cannot trust -> stop
-                } else {
-                    double m = Rmed(x);                      // median kills single-NZ sidelobe variance
-                    if (m > TAU_C)         { if (!kp && !p_has(x)) commit(x); resolved = true; }  // prime power
-                    else if (m < TAU_LO_M) resolved = true;  // clear composite
-                    else                   resolved = (kp || p_has(x));   // ambiguous -> resolved only if known
-                }
+                inreach = tot && (double)cnt / (double)tot >= FRAC_OK;
+            }
+            if (!inreach) {
+                resolved = false;                            // beyond reach(0.5*NZ) -> cannot trust -> stop
+            } else {
+                double m = Rmed(x);                          // median kills single-NZ sidelobe variance
+                if (m > TAU_C)         { if (!kp && !p_has(x)) commit(x); resolved = true; }  // prime power
+                else if (m < TAU_LO_M) resolved = true;      // clear composite
+                else                   resolved = (kp || p_has(x));   // ambiguous -> resolved only if known
             }
             if (resolved) lastHealthy = x; else break;        // STOP at first unresolved (no leapfrog)
         }
