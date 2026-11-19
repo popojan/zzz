@@ -51,6 +51,7 @@ static int g_fitfree = 0;
 typedef struct {
     double *z;  long nz, zcap;       // zero ordinates (z[i] = gamma_{i+1})
     long   *p;  long np, pcap;       // discovered primes (ascending)
+    double *lp, *ph;                 // per prime: log p, p^(-1/2) (the forward sum's hot terms)
     long    Xknown;                  // largest x covered by detection
     long    iter;
     double  kmin;                    // current (annealed) kappa margin
@@ -73,7 +74,11 @@ static int  p_has(const state *st, long x) {     // membership (ascending list)
 }
 static void p_push(state *st, long x) {           // append (x larger than all)
     if (st->np == st->pcap) { st->pcap = st->pcap ? st->pcap * 2 : 256;
-        st->p = realloc(st->p, st->pcap * sizeof(long)); }
+        st->p  = realloc(st->p,  st->pcap * sizeof(long));
+        st->lp = realloc(st->lp, st->pcap * sizeof(double));
+        st->ph = realloc(st->ph, st->pcap * sizeof(double)); }
+    st->lp[st->np] = log((double)x);
+    st->ph[st->np] = pow((double)x, -0.5);
     st->p[st->np++] = x;
 }
 
@@ -130,9 +135,9 @@ static double FB(double t, const state *st, long X) {
     for (long i = 0; i < st->np; ++i) {
         long p = st->p[i];
         if (p > X) break;
-        double lp = log((double)p), pm = (double)p, half = 1.0;
+        double lp = st->lp[i], pm = (double)p;
         for (long m = 1; ; ++m) {
-            half = pow((double)p, -0.5 * m);
+            double half = (m == 1) ? st->ph[i] : pow((double)p, -0.5 * m);
             double term = (half / m) * sin(m * t * lp);
             if (w > 0.0) { double a = m * w * lp; term *= sin(a) / a; }
             acc += term;
@@ -158,7 +163,9 @@ static double locate_march(long k, const state *st, long X, double prev) {
     }
     if (flo * fhi > 0) return prev + gap;                  // fallback: predicted
     for (int it = 0; it < 50; ++it) {
-        double mid = 0.5 * (lo + hi), fm = FB(mid, st, X) - tgt;
+        double mid = 0.5 * (lo + hi);
+        if ((mid == lo && flo != 0.0) || mid == hi) break;   // bracket is two adjacent doubles: done
+        double fm = FB(mid, st, X) - tgt;
         if (flo * fm <= 0) { hi = mid; fhi = fm; } else { lo = mid; flo = fm; }
     }
     return 0.5 * (lo + hi);
@@ -404,6 +411,6 @@ int loop_run(const loop_opts *o) {
     fprintf(stderr, "loop: done. primes=%ld (largest %ld)  zeros=%ld  state=%s\n",
             st.np, st.np ? st.p[st.np - 1] : 0, st.nz, o->state_path);
 
-    free(st.z); free(st.p);
+    free(st.z); free(st.p); free(st.lp); free(st.ph);
     return 0;
 }
