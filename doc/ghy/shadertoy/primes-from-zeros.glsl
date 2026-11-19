@@ -3,7 +3,7 @@
  *
  *  Background = the explicit-formula detector itself:
  *      psi'(x) = 1 + 1/(x - x^3) - (4/sqrt x) * SUM_k cos(gamma_k * log x)
- *  Its spikes sit at prime powers; r = psi'/envelope > 0.30 flags one.
+ *  Its spikes sit at prime powers; r = psi'/(peak height) > 0.40 flags one.
  *  The flaring spike is the prime currently printed (held ~1 s).
  *
  *  STAGE 1 (this file): the gamma_k below are a baked snapshot of zzz --loop's
@@ -67,7 +67,7 @@ const float G[400] = float[](
 659.8138,660.5740,662.2502,664.3031,665.2752,666.5443,667.1130,668.9971,
 670.4187,672.4704,672.9458,674.3131,676.1537,677.2474,677.8014,679.7462
 );
-const float C_ENV = 423.748571; // 5*Li(NZ-4)
+const float C_ENV = 432.739871; // (2/pi)*gamma_max: Landau's peak scale
 // gamma_max = 679.7, reach ~ 272
 const int NP = 55;
 const int PRIMES[55] = int[](2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113,127,131,137,139,149,151,157,163,167,173,179,181,191,193,197,199,211,223,227,229,233,239,241,251,257);
@@ -82,12 +82,12 @@ float pcos(float a){
     return cos(r);
 }
 
-// detector r(x) = psi'(x) / envelope(x)
+// detector r(x) = psi'(x) / (height of a prime's peak at x)
 float Rdet(float x){
     float lx = log(x), s = 0.0;
     for(int k=0;k<NZ;k++) s += pcos(G[k]*lx);
     float psi = 1.0 + 1.0/(x - x*x*x) - (4.0/sqrt(x))*s;
-    float env = C_ENV * lx / x;                 // (20/4)*Li(NZ-4)*log x / x
+    float env = C_ENV * lx / x;                 // (2/pi)*gamma_max*log x / x
     return psi/env;
 }
 
@@ -140,7 +140,7 @@ void mainImage(out vec4 O, in vec2 F){
 
     float baseY = 0.10, scaleY = 0.46;
     float yC   = baseY + clamp(r,-0.3,1.7)*scaleY; // curve height
-    float yThr = baseY + 0.30*scaleY;             // threshold tau=0.30
+    float yThr = baseY + 0.40*scaleY;             // threshold tau=0.40
 
     // reveal: trace exists only up to the current frontier (left-to-right discovery)
     float reveal = smoothstep(xf+6.0, xf+2.0, x);

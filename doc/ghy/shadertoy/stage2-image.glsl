@@ -52,7 +52,7 @@ void mainImage(out vec4 O, in vec2 F){
     float xLo = win.b, xHi = win.a;
     float x = xLo + (xHi-xLo)*uv.x;                       // this column's number-line position
 
-    float baseY=0.10, scaleY=0.46, yThr=baseY+0.30*scaleY;
+    float baseY=0.10, scaleY=0.46, yThr=baseY+DTAU*scaleY;
     int px = int(F.x);
     float yC = baseY + clamp(traceAt(px),  -0.3,1.7)*scaleY;        // uv units (fill-under)
     float yLp=(baseY+clamp(traceAt(px-1),-0.3,1.7)*scaleY)*R.y;     // neighbour heights, pixels

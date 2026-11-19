@@ -1,6 +1,7 @@
 /*  zzz live loop — COMMON tab (shared by Buffer A and Image).
- *  Self-paving primes<->zeros bootstrap, transliterated from loop.c /
- *  loop_frame.c (verified flawless to 615 primes in genuine fp32).
+ *  Self-paving primes<->zeros bootstrap, the decision rule of loop.c in a
+ *  per-frame form.  stage2-sim.c replays these tabs frame by frame in fp32:
+ *  exactly the primes to 1502 at NLIM=8000 and to 8585 at NLIM=60000.
  *
  *  STATE LAYOUT in Buffer A (one RGBA32F texture, indexed linearly):
  *    linear index i  <->  texel ivec2(i % STRIDE, i / STRIDE)
@@ -13,9 +14,10 @@
  */
 const float PI   = 3.14159265358979;
 const float TWO_PI = 6.28318530717959;
-const float EG   = 0.5772156649015329;
-const float DTAU = 0.30;     // detector strong-peak threshold
-const float DLO  = 0.12;     // ambiguous-band floor
+const float DTAU = 0.40;     // commit threshold on the truncation median (primes read
+                             // >= 0.70, composites <= 0.21 in stage2-sim.c)
+const float UMIN = 3.0;      // lag floor: decide x only while gamma(nz/2) >= UMIN*x
+const float BOXC = 0.375;    // forward box-smoothing window, in mean gaps (0 = plain B)
 const int   STRIDE = 256;    // texels per row of state
 const int   ZBASE  = 0;      // zeros start at linear index 0 (.r channel)
 const int   NZMAX  = 60000;  // zero-list cap
@@ -40,8 +42,8 @@ float pcos(float a){ float k=floor(a*0.15915494+0.5); float r=(a-k*6.2831855)+k*
 float psin(float a){ return pcos(a-1.5707963); }
 
 float N0f(float t){ float u=t/TWO_PI; return u*log(u/2.718281828)+0.875; }
-float Eif(float z){ float s=EG+log(z), t=1.0; for(int k=1;k<64;k++){ t*=z/float(k); s+=t/float(k);} return s; }
-float envf(float x, int n){ return (20.0/4.0)*Eif(log(float(n)-4.0))*log(x)/x; } // (20/4)Li(n-4) log x / x
+// height of a prime's peak in the zero sum truncated at gamma (Landau's main term)
+float peakf(float x, float gamma){ return (2.0/PI)*gamma*log(x)/x; }
 
 // invert N0(t)=k-1/2  (smooth gamma estimate; seeds the parallel bisection)
 float smoothGamma(int k){

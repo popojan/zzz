@@ -20,24 +20,39 @@ bool isPP(int x){                                   // perfect power p^m, m>=2 ?
     return false;
 }
 
-// detector r(x) from the nz committed zeros (.r channel of Buffer A)
+// detector r(x) from the nz committed zeros (.r channel of Buffer A): the reading at six
+// truncations of the zero list (0.5 .. 1.0 of nz; prefix sums of one pass), each scaled by
+// its own top zero, and the median of the six.  A single reading oscillates with the
+// truncation height, so near the reach a composite next to a prime can ride a sidelobe.
 float detFire(float x, int nz){
-    float lx=log(x), s=0.0;
-    for(int k=0;k<NLIM;k++){ if(k>=nz) break; s += pcos(texelFetch(iChannel0, idx2(k),0).r * lx); }
-    float psi = 1.0 + 1.0/(x - x*x*x) - (4.0/sqrt(x))*s;
-    return psi/envf(x, nz);
+    float lx=log(x), s=0.0, base=1.0 + 1.0/(x - x*x*x), c4=4.0/sqrt(x), v[6];
+    int b=0, nb=nz/2;
+    for(int k=0;k<NLIM;k++){
+        if(k>=nz) break;
+        float zk=texelFetch(iChannel0, idx2(k),0).r;
+        s += pcos(zk*lx);
+        if(k+1==nb){
+            v[b]=(base - c4*s)/peakf(x, zk);
+            b++; nb = (b==5) ? nz : int(floor((0.5+0.1*float(b))*float(nz)));
+        }
+    }
+    for(int i=1;i<6;i++){ float t=v[i]; int j=i-1;            // insertion sort
+        for(int q=0;q<6;q++){ if(j<0 || v[j]<=t) break; v[j+1]=v[j]; j--; }
+        v[j+1]=t; }
+    return 0.5*(v[2]+v[3]);
 }
 
 // F_B(t): method-B count from the prime-indicator field (.g), primes <= Xk
 float FB(float t, int Xk){
-    float acc=0.0;
+    float acc=0.0, w=BOXC*TWO_PI/log(t/TWO_PI);          // box average over [t-w, t+w]
     for(int x=2;x<XKMAX;x++){
         if(x>Xk) break;
         if(texelFetch(iChannel0, idx2(x),0).g > 0.5){       // x is prime
             float lp=log(float(x)), pm=float(x);
             for(int m=1;m<20;m++){
                 float hf=pow(float(x), -0.5*float(m));
-                acc += (hf/float(m))*psin(float(m)*t*lp);
+                float a=float(m)*w*lp;                      // sinc weight: damps the truncation edge
+                acc += (hf/float(m))*psin(float(m)*t*lp)*(a>0.0 ? sin(a)/a : 1.0);
                 if(pm > float(Xk)/float(x)) break; pm*=float(x);
             }
         }
@@ -82,7 +97,9 @@ void mainImage(out vec4 O, in vec2 F){
     float kmin=c1.b; int iter=int(c1.a+0.5);
 
     // ---- plan this frame (deterministic; every texel computes the same plan) ----
-    int reach=int(float(nz)/2.7);
+    // decide x only where the LOWEST truncation still resolves unit spacing; below about
+    // gamma(nz/2) = 1.8*x a composite between twin primes reads as a prime
+    int reach=int(texelFetch(iChannel0, idx2(nz/2-1),0).r/UMIN);
     int new_X=Xknown+BAND; if(new_X>reach)new_X=reach; if(new_X<Xknown)new_X=Xknown;
     int new_nz=nz;
     if(new_X>=8){
