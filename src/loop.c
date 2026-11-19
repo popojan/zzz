@@ -166,6 +166,11 @@ static double locate_march(long k, const state *st, long X, double prev) {
     double flo = FB(lo, st, X) - tgt, fhi = FB(hi, st, X) - tgt;
     if (flo * fhi > 0) { lo = prev + 0.04 * gap; hi = prev + 2.7 * gap;
         flo = FB(lo, st, X) - tgt; fhi = FB(hi, st, X) - tgt; }
+    // a gap wider than 2.7 mean gaps (about 2 zeros in 10^4): keep widening rather than guess
+    for (double w = 4.0; flo < 0 && fhi < 0 && w <= 16.0; w *= 2.0) {
+        lo = hi; flo = fhi;
+        hi = prev + w * gap; fhi = FB(hi, st, X) - tgt;
+    }
     if (flo * fhi > 0) return prev + gap;                  // fallback: predicted
     for (int it = 0; it < 50; ++it) {
         double mid = 0.5 * (lo + hi), fm = FB(mid, st, X) - tgt;
