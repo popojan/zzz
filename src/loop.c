@@ -46,6 +46,7 @@ static const double ENVK  = 20.0 / 4.0;
 // neither Li nor the empirical 20/4 is needed (5*Li(n-4) ~ 4*gamma_n/2pi to a few % here,
 // drifting to 5:4 asymptotically).
 static int g_fitfree = 0;
+static FILE *g_declog = NULL;       // loop_opts.declog: one line per backward decision
 
 // ---- growable state --------------------------------------------------------
 typedef struct {
@@ -55,6 +56,7 @@ typedef struct {
     long    Xknown;                  // largest x covered by detection
     long    iter;
     double  kmin;                    // current (annealed) kappa margin
+    double  boxc;                    // boxc recorded in a loaded checkpoint (-1: none)
 } state;
 
 static volatile sig_atomic_t g_stop = 0;
@@ -231,21 +233,26 @@ static long backward(state *st, long x_start, long Xcap) {
         }
         int kp = is_known_pow(x, st), resolved;
         int inreach = st->z[nb[0] - 1] >= U_MIN * (double)x;
+        double frac = 1.0;
         if (inreach && x >= X_GATE) {                    // reach frac from the lowest truncation
             long cnt = 0, tot = 0;
             for (long j = x - GW; j <= x + GW; ++j) { if (j < 2) continue; ++tot; if (RAT(j, 0) < TAULO) ++cnt; }
-            inreach = tot && (double)cnt / (double)tot >= FRAC_OK;
+            frac = tot ? (double)cnt / (double)tot : 0.0;
+            inreach = frac >= FRAC_OK;
         }
-        if (!inreach) {
-            resolved = 0;                                // beyond reach(0.5*NZ) -> stop
-        } else {
-            double v[K]; for (int b = 0; b < K; ++b) v[b] = RAT(x, b);
-            qsort(v, K, sizeof(double), cmp_d);
-            double m = 0.5 * (v[K/2 - 1] + v[K/2]);       // median over the K truncations
-            if (m > TAU_C)         { if (!kp && !p_has(st, x)) { p_push(st, x); printf("%ld\n", x); fflush(stdout); } resolved = 1; }
-            else if (m < TAU_LO_M) resolved = 1;         // clear composite
-            else                   resolved = (kp || p_has(st, x));   // ambiguous -> only if known
-        }
+        double v[K]; for (int b = 0; b < K; ++b) v[b] = RAT(x, b);
+        qsort(v, K, sizeof(double), cmp_d);
+        double m = 0.5 * (v[K/2 - 1] + v[K/2]);           // median over the K truncations
+        char code;
+        if (!inreach)          { resolved = 0; code = 'G'; }          // beyond reach(0.5*NZ) -> stop
+        else if (m > TAU_C)    { if (!kp && !p_has(st, x)) { p_push(st, x); printf("%ld\n", x); fflush(stdout); }
+                                 resolved = 1; code = 'P'; }
+        else if (m < TAU_LO_M) { resolved = 1; code = 'C'; }          // clear composite
+        else                   { resolved = (kp || p_has(st, x)); code = resolved ? 'a' : 'A'; }  // ambiguous -> only if known
+        if (g_declog && (x > st->Xknown || !resolved))   // re-scanned candidates are logged once
+            fprintf(g_declog, "%ld\t%ld\t%ld\t%.3f\t%.3f\t%.4f\t%c\t%d\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\n",
+                    st->iter, x, nz, st->z[nz - 1], frac, m, code, kp,
+                    RAT(x, 0), RAT(x, 1), RAT(x, 2), RAT(x, 3), RAT(x, 4), RAT(x, 5));
         if (resolved) Xk = x; else break;                // contiguous: stop at first unresolved
     }
 #undef RAT
@@ -268,8 +275,8 @@ static int save_state(const state *st, const char *path) {
     char tmp[1024]; snprintf(tmp, sizeof tmp, "%s.tmp", path);
     FILE *f = fopen(tmp, "w");
     if (!f) { fprintf(stderr, "loop: cannot write %s\n", tmp); return 1; }
-    fprintf(f, "# zzz --loop checkpoint\niter %ld\nxknown %ld\nkmin %.17g\n",
-            st->iter, st->Xknown, st->kmin);
+    fprintf(f, "# zzz --loop checkpoint\niter %ld\nxknown %ld\nkmin %.17g\nboxc %.17g\n",
+            st->iter, st->Xknown, st->kmin, g_boxc);
     fprintf(f, "nprimes %ld\n", st->np);
     for (long i = 0; i < st->np; ++i) fprintf(f, "%ld\n", st->p[i]);
     fprintf(f, "nzeros %ld\n", st->nz);
@@ -287,6 +294,7 @@ static int load_state(state *st, const char *path) {
         if (sscanf(line, "iter %ld", &st->iter) == 1) continue;
         if (sscanf(line, "xknown %ld", &st->Xknown) == 1) continue;
         if (sscanf(line, "kmin %lf", &st->kmin) == 1) continue;
+        if (sscanf(line, "boxc %lf", &st->boxc) == 1) continue;
         if (sscanf(line, "nprimes %ld", &count) == 1) {
             for (long i = 0; i < count; ++i) { long p; if (fscanf(f, "%ld\n", &p) == 1) p_push(st, p); }
             continue;
@@ -317,6 +325,8 @@ void loop_opts_default(loop_opts *o) {
     o->batch = 2000;
     o->fresh = 0;
     o->boxc = 0.375;
+    o->boxc_set = 0;
+    o->declog = NULL;
     o->verbose = 0;
 }
 
@@ -339,9 +349,18 @@ int loop_run(const loop_opts *o) {
     }
 
     st.kmin = o->kmin;
+    st.boxc = -1.0;
     if (resume) {
         if (load_state(&st, o->state_path)) return 1;   // restores st.kmin too
         if (o->kmin_set) st.kmin = o->kmin;             // explicit --loop-kmin overrides
+        // keep one forward variant per zero list unless told otherwise
+        if (st.boxc < 0.0)
+            fprintf(stderr, "loop: checkpoint has no boxc record (older format; its zeros may be plain-B); "
+                    "continuing with boxc=%.3f\n", g_boxc);
+        else if (!o->boxc_set) g_boxc = st.boxc;
+        else if (st.boxc != g_boxc)
+            fprintf(stderr, "loop: checkpoint zeros were located with boxc=%.3f; continuing with boxc=%.3f\n",
+                    st.boxc, g_boxc);
     } else {
         long ns = (o->seed_n > 0 && o->seed_n < NSEED) ? o->seed_n : NSEED;
         if (ns < 6) { fprintf(stderr, "loop: seed must be >= 6 zeros\n"); return 1; }
@@ -354,8 +373,12 @@ int loop_run(const loop_opts *o) {
     printf("# zzz --loop: primes derived from zeros (one per line). trajectory on stderr.\n");
     fflush(stdout);
 
+    if (o->declog && !(g_declog = fopen(o->declog, resume ? "a" : "w"))) {
+        fprintf(stderr, "loop: cannot write %s\n", o->declog); return 1; }
+
     long prev_X = st.Xknown, stalled = 0, best_X = st.Xknown, no_improve = 0;
-    while (!g_stop && (o->max_iters == 0 || st.iter < o->max_iters)) {
+    long last_iter = o->max_iters > 0 ? st.iter + o->max_iters : 0;
+    while (!g_stop && (last_iter == 0 || st.iter < last_iter)) {
         st.iter++;
         // re-detect from just below the known frontier (lower primes already found),
         // so frequent re-detection stays cheap with small forward batches; Xcap is a
@@ -411,6 +434,7 @@ int loop_run(const loop_opts *o) {
     fprintf(stderr, "loop: done. primes=%ld (largest %ld)  zeros=%ld  state=%s\n",
             st.np, st.np ? st.p[st.np - 1] : 0, st.nz, o->state_path);
 
+    if (g_declog) { fclose(g_declog); g_declog = NULL; }
     free(st.z); free(st.p); free(st.lp); free(st.ph);
     return 0;
 }

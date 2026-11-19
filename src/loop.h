@@ -17,7 +17,7 @@
 typedef struct {
     const char *state_path;  // checkpoint file [zzz-loop.state]
     int resume;              // resume from state_path instead of the seed
-    long max_iters;          // 0 = until stalled or interrupted
+    long max_iters;          // stop after this many more iterations (0 = until stalled or interrupted)
     long nmax_zeros;         // safety cap on the zero list [2000000]
     double kmin;             // (starting) kappa margin for the forward step [5.0]
     int kmin_set;            // user passed --loop-kmin (overrides resumed value)
@@ -28,6 +28,8 @@ typedef struct {
     long batch;              // zeros per re-detect (smooth streaming) [2000; 0=all]
     int fresh;               // force a fresh start, ignoring any checkpoint
     double boxc;             // forward box-smoothing window w = boxc*gap(t) [0.375; 0 = plain B]
+    int boxc_set;            // user passed --loop-boxc (overrides the value a checkpoint records)
+    const char *declog;      // log every backward decision to this TSV (see doc/ghy/loop-margins.py)
     int verbose;
 } loop_opts;
 

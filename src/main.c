@@ -1200,6 +1200,8 @@ static struct argp_option options[] = {
         { "loop-fresh", 1009, 0, 0, "--loop: force a fresh start, ignoring any existing checkpoint"},
         { "loop-batch", 1010, "N", 0, "--loop: zeros per re-detect for smooth streaming [2000; 0=whole frontier]"},
         { "loop-boxc", 1011, "C", 0, "--loop: forward box-smoothing window w = C*gap(t) [0.375; 0 = plain B]"},
+        { "loop-iters", 1012, "N", 0, "--loop: stop (and checkpoint) after N more iterations"},
+        { "loop-declog", 1013, "FILE", 0, "--loop: log every backward decision to FILE (TSV; analyse with doc/ghy/loop-margins.py)"},
         { 0 }
 };
 
@@ -1230,6 +1232,8 @@ struct arguments {
     slong loop_fresh;
     slong loop_batch;
     double loop_boxc;
+    slong loop_iters;
+    const char *loop_declog;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -1262,6 +1266,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 1009: arguments->loop_fresh = 1; break;
         case 1010: arguments->loop_batch = atol(arg); break;
         case 1011: arguments->loop_boxc = atof(arg); break;
+        case 1012: arguments->loop_iters = atol(arg); break;
+        case 1013: arguments->loop_declog = arg; break;
         case ARGP_KEY_ARG: return 0;
         default: return ARGP_ERR_UNKNOWN;
     }
@@ -1323,6 +1329,8 @@ int main(int argc, char *argv[])
     arguments.loop_fresh = 0;
     arguments.loop_batch = -1;
     arguments.loop_boxc = -1.0;
+    arguments.loop_iters = 0;
+    arguments.loop_declog = NULL;
 
     int arg_index = 1;
     argp_parse(&argp, argc, argv, ARGP_NO_ARGS, &arg_index, &arguments);
@@ -1341,7 +1349,9 @@ int main(int argc, char *argv[])
         lo.contrast = arguments.loop_contrast;
         lo.fresh = arguments.loop_fresh;
         if (arguments.loop_batch >= 0) lo.batch = arguments.loop_batch;
-        if (arguments.loop_boxc >= 0.0) lo.boxc = arguments.loop_boxc;
+        if (arguments.loop_boxc >= 0.0) { lo.boxc = arguments.loop_boxc; lo.boxc_set = 1; }
+        if (arguments.loop_iters > 0) lo.max_iters = arguments.loop_iters;
+        lo.declog = arguments.loop_declog;
         lo.verbose = arguments.verbose;
         return loop_run(&lo);
     }
