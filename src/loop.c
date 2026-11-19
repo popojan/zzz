@@ -186,12 +186,9 @@ static double locate_march(long k, const state *st, long X, double prev) {
 // STRICTLY CONTIGUOUSLY -- it stops at the first unresolved candidate and never
 // leapfrogs one (a skipped prime would be a permanent miss: nothing downstream notices
 // or repairs a wrong list).  Commits happen where even the LOWEST truncation resolves unit
-// spacing, gamma(0.5*NZ) >~ pi*x; there the median is bimodal-clean (primes ~0.8,
-// composites ~-0.05 +- 0.07).  The reach gate finds that point statistically; U_MIN states
-// the requirement outright.  Measured floor (doc/notes/loop-margins.md): below
-// gamma(0.5*NZ) ~ 1.8*x a composite between twin primes rides both main lobes and reads as
-// a prime, at every height; the gate has not let the ratio under 2.8.  Below X_GATE the
-// window is too prime-power-dense for the gate, and the floor alone bounds the reach.
+// spacing, gamma(0.5*NZ) >~ pi*x (primes ~0.8, composites ~-0.05 +- 0.07).  The reach gate
+// finds that point statistically; U_MIN states it outright: below gamma(0.5*NZ) ~ 1.8*x a
+// composite between twin primes reads as a prime, at every height (doc/notes/loop-margins.md).
 static long backward(state *st, long x_start, long Xcap) {
     const long   GW = 30;            // reach-gate neighbourhood half-width
     const double FRAC_OK = 0.70;     // clear-composite fraction (lowest truncation) => inside reach
