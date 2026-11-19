@@ -82,18 +82,18 @@ compare within groups.) Readings:
 ## Usage and defaults
 
 `--loop-boxc C` sets `w = C·gap(t)`; **default 0.375 (on)**, `0` restores plain
-B. The knob is runtime-only (not checkpointed): resuming an old plain-B state
-continues with box-B unless `--loop-boxc 0` is passed. The ceiling message now
-reports which forward step hit it.
+B. Since 2026-11 the checkpoint records it (`boxc` line) and a resume keeps the
+recorded value unless `--loop-boxc` is passed; a checkpoint without the line
+(older, possibly plain-B) continues with the current default and says so.
 
 ## Follow-ups
 
 - **Port to loopvk's forward kernel** — the weight is a per-term multiply, GPU
   trivial (unlike a Weil forward step); expected to shrink the frontier lag
   (~2–3× zeros) that dominates loopvk's cost.
-- **Lower kmin floor.** With 2× extra snap margin the anneal floor (3.5 ≈ 1.1π)
-  may be approachable; gains shrink toward κ = π, so expect diminishing returns,
-  not a wall crossing.
+- ~~Lower kmin floor.~~ Moot since 2026-11: the loop runs at κ ≈ 6.3, `kmin`
+  never binds after the first two iterations and the anneal was removed
+  ([`loop-margins.md`](loop-margins.md)).
 - The polylog↔zeta "circularity" behind the closed form is the Möbius–ζ ladder
   (`P(s) = Σ μ(k)/k · log ζ(ks)`) — orbit §4.2.5's verdict applies: it closes
   enumeration, never evaluation; the per-prime Lerch functional equation

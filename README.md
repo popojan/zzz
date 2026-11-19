@@ -18,7 +18,7 @@ fast approximation of large Riemann zeta zeros
   -L, --loop                 self-paving zeros<->primes bootstrap (zeta-free,
                              primality-free): derive primes from zeros and zeros from
                              primes; streams primes, auto-resumes, Ctrl+C-able
-                             (--resume, --loop-{batch,kmin,nmax,contrast,...}; --help)
+                             (--resume, --loop-{batch,kmin,nmax,boxc,...}; --help)
   -d, --digits=DIGITS        extra digits for number formatting [default 6]
   -p, --precision=PREC       arb precision for the counting function [default 256]
   -z, --zeta-prec=ZETA_PREC  arb precision for zeta evaluation [default 64]
@@ -127,14 +127,16 @@ It is a *demonstration* (box-smoothed method-B forward, double precision, modest
 heights). It commits a candidate $x$ once its zeros reach $T\approx2\pi x$, far
 above the band-saturation curve $X=\sqrt{T/2\pi}$, so that wall is not what
 limits it: the margin on each prime/composite decision grows with height, and what
-ends a run is cost, $\sim X^2\log^2X$. `--loop-contrast` replaces the empirical
-$\psi'$ envelope by a fit-free peak scale. Measured margins and what would break
+ends a run is cost, $\sim X^2\log^2X$. The detector has no fitted constant: each
+candidate is read against the peak height the loop's own top zero implies. Measured margins and what would break
 them: [`doc/notes/loop-margins.md`](doc/notes/loop-margins.md); mechanism, history
 and seed limits: [`doc/notes/zeros-primes-bootstrap.md`](doc/notes/zeros-primes-bootstrap.md).
 
 **Live GPU demo.** The whole loop runs in-shader (fp32, 40-zero seed, no sieve,
 no ζ) on Shadertoy: <https://www.shadertoy.com/view/s3BSzD> — source and setup
-under [`doc/ghy/shadertoy/`](doc/ghy/shadertoy/).
+under [`doc/ghy/shadertoy/`](doc/ghy/shadertoy/). (The tabs in the repo were corrected in
+2026-11 — the published copy flags a few composites, the first at 417, until they are
+pasted again; see [`stage2-README.md`](doc/ghy/shadertoy/stage2-README.md).)
 
 ## Zero counting function approximation
 

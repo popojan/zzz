@@ -103,14 +103,15 @@ closed primes⇄zeros loop with **both** heavy sums on the GPU — forward
 primality test in the loop body; pure fp64 (modest heights), so it's FLINT-free.
 
 ```
-loopvk [maxX] [kmin] [statefile] [kmin_floor]      # default: 500 4.0 zzz-loop.state 3.5
+loopvk [maxX] [kmin] [statefile]      # default: 500 4.0 zzz-loop.state
 ```
 
 **Feature parity with `zzz --loop`:**
 - **Checkpoint / auto-resume / Ctrl+C** to the **same `zzz-loop.state` format** as
   `loop.c` — so CPU and GPU runs are **interoperable**: a CPU `./zzz --loop` resumes
   a `loopvk` checkpoint and vice versa (verified).
-- **Auto-anneal**: on stall, `kmin ×= 0.9` down to `kmin_floor`.
+- Same decision rule and peak scale as `loop.c`; the forward step is plain method B (no box
+  smoothing yet), which the checkpoint records as `boxc 0`.
 
 ## Backward detector: NZ-median + contiguous frontier (why it stays correct)
 

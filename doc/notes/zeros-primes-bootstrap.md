@@ -69,7 +69,7 @@ needed at this scale.
 > current `--loop`.** They rest on the measured reach of the *single-truncation*
 > detector, $X\sim n^{0.5}$. Since the truncation-median detector (2026-06-23) the
 > loop commits at $X\approx T/2\pi$, i.e. $X\propto n/\log n$: the forward margin
-> sits at $\kappa\approx6.3$, `kmin` never binds, and no anneal or ceiling occurs
+> sits at $\kappa\approx6.3$, `kmin` binds only in the first two iterations, and no ceiling occurs
 > (fresh run to $X=3.5\times10^4$). What limits the loop, and what does not, is
 > measured in [`loop-margins.md`](loop-margins.md). The analysis below stays as the
 > record of why a reach of $n^{0.5}$ *would* stall.
@@ -123,7 +123,7 @@ primes, checkpoints for `--loop --resume`, and catches Ctrl+C. Verified: every s
 correct (zero false positives), confirming the contraction map empirically — $X^\*(\mathrm{kmin}{=}5)=104$,
 $X^\*(\mathrm{kmin}{=}4)>503$ (96 primes). Lowering the margin raises the ceiling, exactly as predicted.
 
-**Auto-annealing (default; dormant since the median detector, see the status note above).** Rather than make the user re-launch with a smaller margin at each
+**Auto-annealing (removed 2026-11; it had not fired since the median detector).** Rather than make the user re-launch with a smaller margin at each
 ceiling, `--loop` automatically lowers $\mathrm{kmin}$ (×0.9) whenever it stalls, down to a floor
 (`--loop-kmin-floor`, default 3.5, kept above $\pi$ so plain-B stays correct) — so one invocation
 climbs through successive ceilings on its own and stops at the plain-B wall with an honest message
@@ -141,20 +141,15 @@ cheap). `--loop-fresh` forces a fresh start; `--resume` is the explicit form (er
 checkpoint). Verified end-to-end: interrupt at X=1293, relaunch, auto-resume to X=1643 — 259 primes,
 all correct.
 
-**Two peak scales (A/B).** Same detector, same thresholds; only the normalisation differs:
-
-| scale | fitted constant | min seed |
-|---|---|---|
-| envelope (default) | Li form + 20/4 (matched-filter peak scale) | 6 zeros, 0 primes |
-| `--loop-contrast` | **none**: Landau's main term $\tfrac{2}{\pi}\gamma_n\,\tfrac{\log x}{x}$ from the loop's own top zero | 6 zeros, 0 primes |
-
-Both give exactly the primes from every seed size 6…40 (`ctest`, `smoke.loop`). The fit-free scale
-shows the loop needs **neither Li nor the 20/4** — $5\,\mathrm{Li}(n-4)\approx4\gamma_n/2\pi$ to a few
-percent at these heights (the Li form drifts to $5:4$ asymptotically; the fit-free one does not).
-*History:* until 2026-11 `--loop-contrast` was a local-MAD (CFAR) detector. Its threshold was
-relative to the composite noise rather than to the prime peak, so its false-alarm rate per candidate
-was fixed, and it emitted $437=19\cdot23$ from a fresh start; it was replaced, not tuned. Soundness
-of the envelope rests not on its tuned constant but on two *provable* facts: composites have $\psi'\approx0$ structurally, and the truncation turns each
+**The peak scale.** Each candidate is read as a fraction of Landau's main term
+$\tfrac{2}{\pi}\gamma_n\,\tfrac{\log x}{x}$, with $\gamma_n$ the loop's own top zero: no fitted
+constant, and it gives exactly the primes from every seed size 6…40 (`ctest`, `smoke.loop`).
+*History:* until 2026-11 the default scale was the empirical envelope above,
+$\tfrac{20}{4}\mathrm{Li}(n-4)$, which equals $4\gamma_n/2\pi$ to a few percent at these heights but
+drifts to $5:4$ asymptotically; and `--loop-contrast` was a local-MAD (CFAR) alternative whose
+threshold was relative to the composite noise rather than to the prime peak, so its false-alarm
+rate per candidate was fixed — it emitted $437=19\cdot23$ from a fresh start. Both are gone.
+Soundness of the scale rests on two *provable* facts: composites have $\psi'\approx0$ structurally, and the truncation turns each
 prime-power delta into a Dirichlet-kernel peak of height $\propto\gamma_n\log x/x$ (and
 $\mathrm{Li}(n)\approx\gamma_n/2\pi$). The naive textbook detector $\int\psi'=\Lambda$ *fails* under
 truncation (the uncancelled $+1$ baseline), so the matched-filter normalisation is doing real work.

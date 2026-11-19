@@ -25,11 +25,11 @@ Write $a=\gamma_{\rm top}/(2\pi x)$ for the **lag** at which a candidate $x$ is 
 
 | quantity | measured | note |
 |---|---|---|
-| lag at commit | $a\approx0.85$–$1.2$, median $0.91$ | so $X\approx T/2\pi$, i.e. $X\propto n/\log n$, not $n^{0.5}$ |
-| forward margin | $\kappa=2\pi\log X/\log(T/2\pi)\approx6.3$ | `kmin` (5.0) never binds; no anneal, no ceiling |
+| lag at commit | $a\approx0.85$–$1.2$, median $0.92$ | so $X\approx T/2\pi$, i.e. $X\propto n/\log n$, not $n^{0.5}$ |
+| forward margin | $\kappa=2\pi\log X/\log(T/2\pi)\approx6.3$ | `kmin` (5.0) binds only in the first two iterations; no stall |
 | zero error, box-B (default) | $0.025$ mean gap rms | vs FLINT, at $T=2.6\times10^4$ and $1.4\times10^5$ |
 | zero error, plain B | $0.052\to0.040$ gap rms | index $3\times10^3\to2.6\times10^6$: slowly *improving* |
-| new-prime peak, box-B / plain B | $\approx0.85$ / $\approx0.68$ of the envelope | a prime already in the forward sum reads $\approx1.0$–$1.1$ |
+| new-prime peak, box-B / plain B | $\approx0.85$ / $\approx0.70$ of Landau's main term | a prime already in the forward sum reads $\approx1.0$–$1.1$ |
 
 The forward step needs $X\gtrsim(T/2\pi)^{\kappa/2\pi}=(T/2\pi)^{0.8}$ for $\kappa\ge5$ and
 is given $X\approx T/2\pi$. That slack is a growing power of $T$, so the forward step
@@ -43,34 +43,33 @@ $>0.40$ commits a prime, $<0.25$ a composite):
 
 | $x$ range | lag $a$ | primes: mean ± sd (min) | composites: mean ± sd (max) | distance to 0.40 | var·$a$·$\ln x$ | $\alpha$ |
 |---|---|---|---|---|---|---|
-| 600–1372 | 1.20 | 0.869 ± 0.038 (0.776) | −0.047 ± 0.067 (0.136) | 6.7σ | 0.037 | 3.3 |
-| 1372–3137 | 0.97 | 0.867 ± 0.040 (0.769) | −0.073 ± 0.075 (0.135) | 6.3σ | 0.042 | 2.6 |
-| 3137–7173 | 0.95 | 0.856 ± 0.038 (0.742) | −0.067 ± 0.074 (0.150) | 6.3σ | 0.044 | 2.3 |
-| 7173–16400 | 0.91 | 0.835 ± 0.036 (0.723) | −0.060 ± 0.067 (0.156) | 6.8σ | 0.039 | 2.5 |
-| 16400–37500 | 0.91 | 0.820 ± 0.031 (0.714) | −0.054 ± 0.063 (0.156) | 7.2σ | 0.037 | 2.6 |
+| 600–1366 | 1.19 | 0.858 ± 0.038 (0.765) | −0.047 ± 0.066 (0.134) | 6.8σ | 0.036 | 3.4 |
+| 1366–3112 | 0.97 | 0.859 ± 0.039 (0.765) | −0.072 ± 0.074 (0.133) | 6.4σ | 0.041 | 2.6 |
+| 3112–7088 | 0.95 | 0.854 ± 0.038 (0.739) | −0.067 ± 0.074 (0.148) | 6.3σ | 0.044 | 2.4 |
+| 7088–16142 | 0.91 | 0.840 ± 0.035 (0.730) | −0.061 ± 0.068 (0.158) | 6.8σ | 0.039 | 2.5 |
+| 16142–36764 | 0.91 | 0.831 ± 0.031 (0.726) | −0.055 ± 0.064 (0.159) | 7.1σ | 0.038 | 2.5 |
 
-37 498 decisions, 3968 primes, none wrong, none missed; 158 scan stops, all "out of
-reach", none ambiguous; lag at commit between 0.846 and 1.57 (median 0.91). Composite tail,
-standardised per bin: $P(z>3)=1.5\times10^{-4}$ against a Gaussian $1.3\times10^{-3}$,
-nothing beyond $3.5\sigma$ in 33 000.
+36 762 decisions, 3897 primes, none wrong, none missed; 156 scan stops, all "out of
+reach", none ambiguous; lag at commit between 0.846 and 1.54 (median 0.92). Composite tail,
+standardised per bin: $P(z>3)=1.2\times10^{-4}$ against a Gaussian $1.3\times10^{-3}$,
+nothing beyond $3.5\sigma$ in 32 000.
 
-The same 25-minute run in the other variants, last bin ($x\approx1.7$–$4\times10^4$):
+The same 25-minute run in the other variants, last bin ($x\approx1.6$–$4\times10^4$):
 
 | variant | reached | primes: mean ± sd (min) | composites: sd (max) | distance to 0.40 | $\alpha$ |
 |---|---|---|---|---|---|
-| default (box-B, Li scale) | 37 499 | 0.820 ± 0.031 (0.714) | 0.063 (0.156) | 7.2σ | 2.6 |
-| `--loop-contrast` (fit-free scale) | 36 763 | 0.831 ± 0.031 (0.726) | 0.064 (0.159) | 7.1σ | 2.5 |
-| `--loop-boxc 0` (plain B) | 41 617 | 0.692 ± 0.052 (0.522) | 0.071 (0.235) | 6.2σ | 1.8 |
-| `--loop-seed 6` | 37 498 | (same detector as default) | | | |
+| default (box-B) | 36 763 | 0.831 ± 0.031 (0.726) | 0.064 (0.159) | 7.1σ | 2.5 |
+| `--loop-seed 6` | 36 762 | 0.831 ± 0.031 (0.736) | 0.064 (0.128) | 7.2σ | 2.5 |
+| `--loop-boxc 0` (plain B) | 41 597 | 0.702 ± 0.053 (0.530) | 0.072 (0.233) | 6.1σ | 1.8 |
 
-All four lists are exactly the primes. Plain B has the thinner margin throughout (and two
-ambiguous stops); the older 2.7M-zero plain-B checkpoint reads $0.68\pm0.047$ and $6.8\sigma$
-at $x\approx2.5\times10^5$.
+All three lists are exactly the primes. Plain B has the thinner margin throughout (and one
+ambiguous stop); the older 2.7M-zero plain-B checkpoint, read with the former Li scale,
+gave $0.68\pm0.047$ and $6.8\sigma$ at $x\approx2.5\times10^5$.
 
 - **Scaling.** The composite variance falls like $1/(a\log x)$ (`var*a*lnx` is flat or
   falling), because each candidate is read with $\sim a\log x$ zeros' worth of signal.
   With a Gaussian tail the false-positive probability per candidate is $x^{-\alpha}$,
-  $\alpha=z^2/(2\log x)\approx2.3$–$2.6$ (plain B: $\approx1.8$–$2.1$). Since $\alpha>1$ the sum over all $x>X$ converges
+  $\alpha=z^2/(2\log x)\approx2.4$–$2.6$ (plain B: $\approx1.8$–$2.2$). Since $\alpha>1$ the sum over all $x>X$ converges
   and is tiny ($\sim X^{1-\alpha}$). The observed tail is *lighter* than Gaussian.
 - **Composition of the noise** (`loop-replay.py` model, correlation $\approx0.8$ with the
   logged readings): mostly the truncation sidelobes of neighbouring primes, which the
@@ -78,24 +77,25 @@ at $x\approx2.5\times10^5$.
   $\approx0.021/(a_b\log x)$ per truncation from the zero errors.
 - **Misses** are further away still: a prime would have to read below $0.25$, about
   $15\sigma$.
-- **Slow drift.** The prime peak in the default (Li) normalisation declines by a few
-  percent per decade of $x$ (0.87 → 0.82 above; 0.86 → 0.83 with the fit-free scale), because $5\,\mathrm{Li}(n-4)$ creeps from $\approx4\gamma_n/2\pi$
-  toward $5\gamma_n/2\pi$; the asymptote is still $\approx0.6$–$0.7$, above $0.40$, and
-  crossing it would stall the loop, not corrupt it. `--loop-contrast` (fit-free scale
-  $\tfrac2\pi\gamma_n$) has no such drift.
+- **No drift in the scale.** Until 2026-11 the reading was normalised by the empirical
+  envelope $5\,\mathrm{Li}(n-4)$, which creeps from $\approx4\gamma_n/2\pi$ toward
+  $5\gamma_n/2\pi$, so the prime peak sank by a few percent per decade of $x$. The scale is
+  now Landau's main term itself, $\tfrac2\pi\gamma_n\tfrac{\log x}{x}$, from the loop's own top
+  zero. The small decline left in the table (0.86 → 0.83) is not a scale effect; the replay
+  below has the lowest prime reading *rising* with height.
 
 ## The one condition: the lag floor
 
 Replaying the rule on the real primes around $x_0$ (`loop-replay.py`), as a function of
 the lag:
 
-| $x_0$ | false primes at $a=0.5$ (per $10^6$) | at $a=0.55$ | at $a\ge0.6$ | gate still passes at $a=0.5$ |
-|---|---|---|---|---|
-| $2.5\times10^5$ | 2951 | 143 | 0 | 80% |
-| $10^7$ | 2688 | 90 | 0 | 90% |
-| $10^9$ | 2071 | 28 | 0 | 96% |
-| $10^{12}$ | 1364 | 9 | 0 | 99% |
-| $10^{15}$ | 844 | 4 | 0 | 99.7% |
+| $x_0$ (candidates) | false primes at $a=0.5$ | at $a=0.55$ | at $a\ge0.6$ | gate still passes at $a=0.5$ | lowest prime reading at $a=0.9$ |
+|---|---|---|---|---|---|
+| $2.5\times10^5$ ($2.5\times10^5$) | 804 | 61 | 0 | 76% | 0.67 |
+| $10^7$ ($10^6$) | 3318 | 163 | 0 | 89% | 0.69 |
+| $10^9$ ($10^6$) | 2612 | 113 | 0 | 96% | 0.71 |
+| $10^{12}$ ($10^6$) | 1732 | 77 | 0 | 98.8% | 0.75 |
+| $10^{15}$ ($10^6$) | 1079 | 49 | 0 | 99.6% | 0.76 |
 
 Every false prime is a composite **between twin primes**: once the lowest truncation no
 longer resolves unit spacing ($\gamma(0.5N_Z)\lesssim1.8\,x$) it rides both main lobes.
@@ -144,7 +144,9 @@ above, not a self-check.
 
 | problem | fix |
 |---|---|
-| `--loop-contrast` emitted $437=19\cdot23$ (threshold relative to composite noise: fixed false-alarm rate per candidate) | replaced by a fit-free peak scale $\tfrac2\pi\gamma_n\tfrac{\log x}{x}$ in the shared detector; no warm-start primes |
+| `--loop-contrast` (local-MAD detector) emitted $437=19\cdot23$: its threshold was relative to composite noise, a fixed false-alarm rate per candidate | removed |
+| the default scale $\tfrac{20}{4}\mathrm{Li}(n-4)$ was an empirical fit that drifts 25% asymptotically | one scale, $\tfrac2\pi\gamma_n\tfrac{\log x}{x}$ from the loop's own top zero; no fitted constant |
+| anneal / ceiling machinery from the $n^{0.5}$-reach era never fired | removed; `kmin` stays as the forward margin, a flat reach stops the run |
 | `--loop-seed 6` emitted 18, 22, 24, … (the $x<512$ single-reading branch had no reach limit) | one rule for every $x$: truncation median behind the lag floor |
 | the safety condition was only implicit | $U_{\min}=2.5$ lag floor |
 | `locate_march` returned `prev + gap` when the true gap exceeded 2.7 mean gaps (≈2 zeros in $10^4$; one caught at index 600 051, off by 1.8 gaps) | the bracket widens to 4, 8, 16 gaps first |
@@ -156,7 +158,7 @@ Both speed-ups leave checkpoints byte-identical. Per iteration at $X=3.5\times10
 ($3\times10^5$ zeros, one core): backward 7.2 s → 0.8 s, forward 22.3 s → 9.5 s. Note
 the forward step is the larger part at these heights; the backward part only overtakes
 it near $\log X\approx16$. `smoke.loop` in `ctest` checks that the default, plain-B,
-fit-free and 6-zero-seed variants emit exactly the primes.
+and 6-zero-seed variants emit exactly the primes.
 
 Not done, because they change low-order bits and would need re-validation: a
 derivative-based root step in place of bisection (~5 evaluations instead of ~35), and an
