@@ -1,6 +1,6 @@
 // loopvk.cpp -- the self-paving zeros<->primes loop, BOTH directions on the GPU.
 //
-//   loopvk [maxX] [kmin] [statefile] [kmin_floor]
+//   loopvk [maxX] [kmin] [statefile]
 //
 // A Vulkan port of `loop.c` (see doc/notes/zeros-primes-bootstrap.md): from a
 // finite seed of zero ordinates it detects primes (backward: psi.comp, a
@@ -11,8 +11,7 @@
 //
 // Feature parity with `zzz --loop`: auto-resume + Ctrl+C checkpoint to the SAME
 // `zzz-loop.state` format (so a CPU run and a GPU run are interoperable -- resume
-// either on the other), and auto-anneal of kmin on stall.  Verification is
-// post-hoc and clearly separated.
+// either on the other).  Verification is post-hoc and clearly separated.
 
 #include <kompute/Kompute.hpp>
 #include <cmath>
@@ -46,7 +45,7 @@ static const double SEED[] = {
 };
 #define NSEED ((long)(sizeof(SEED)/sizeof(SEED[0])))
 
-static const double TAULO = 0.12, ENVK = 20.0 / 4.0;
+static const double TAULO = 0.12;
 
 struct PCfwd { uint32_t P, M; int32_t Wc; float rho, rho1, c0, gap; };
 struct PCbwd { uint32_t NZ, X0, NX, KB; };   // KB prefix-sum truncations emitted per candidate
@@ -59,12 +58,6 @@ static std::vector<uint32_t> load_spv(const char *path) {
 }
 
 // ---- fp64 primitives (port of loop.c) --------------------------------------
-static double ei(double zz) {
-    double s = 0.57721566490153286061 + log(zz), t = 1.0;
-    for (int k = 1; k < 400; ++k) { t *= zz / k; double a = t / k; s += a;
-        if (fabs(a) < 1e-15 * fabs(s) && k > zz) break; } return s;
-}
-static double li(double x) { return ei(log(x)); }
 static double N0(double t)  { double u = t / (2 * M_PI); return u * log(u / M_E) + 0.875; }
 static double N0p(double t) { return log(t / (2 * M_PI)) / (2 * M_PI); }      // density
 static double t_of_index(long n) {                                            // N0(t)=n-1/2
@@ -104,7 +97,8 @@ static int save_state(const char *path, long iter, long Xknown, double kmin) {
     char tmp[1024]; snprintf(tmp, sizeof tmp, "%s.tmp", path);
     FILE *f = fopen(tmp, "w");
     if (!f) { fprintf(stderr, "loopvk: cannot write %s\n", tmp); return 1; }
-    fprintf(f, "# zzz --loop checkpoint\niter %ld\nxknown %ld\nkmin %.17g\n", iter, Xknown, kmin);
+    // boxc 0: this port locates zeros with plain method B (loop.c resumes with the same)
+    fprintf(f, "# zzz --loop checkpoint\niter %ld\nxknown %ld\nkmin %.17g\nboxc 0\n", iter, Xknown, kmin);
     fprintf(f, "nprimes %zu\n", primes.size());
     for (long p : primes) fprintf(f, "%ld\n", p);
     fprintf(f, "nzeros %zu\n", z.size());
@@ -116,9 +110,10 @@ static int save_state(const char *path, long iter, long Xknown, double kmin) {
 static int load_state(const char *path, long *iter, long *Xknown, double *kmin) {
     FILE *f = fopen(path, "r");
     if (!f) { fprintf(stderr, "loopvk: cannot open %s for resume\n", path); return 1; }
-    char line[256]; long count;
+    char line[256]; long count; double boxc = 0.0;
     while (fgets(line, sizeof line, f)) {
         if (line[0] == '#') continue;
+        if (sscanf(line, "boxc %lf", &boxc) == 1) continue;
         if (sscanf(line, "iter %ld", iter) == 1) continue;
         if (sscanf(line, "xknown %ld", Xknown) == 1) continue;
         if (sscanf(line, "kmin %lf", kmin) == 1) continue;
@@ -134,6 +129,8 @@ static int load_state(const char *path, long *iter, long *Xknown, double *kmin) 
     fclose(f);
     fprintf(stderr, "loopvk: resumed iter=%ld X_known=%ld primes=%zu zeros=%zu\n",
             *iter, *Xknown, primes.size(), z.size());
+    if (boxc > 0.0)
+        fprintf(stderr, "loopvk: checkpoint zeros were located with boxc=%.3f; continuing with plain B\n", boxc);
     return 0;
 }
 
@@ -141,7 +138,6 @@ int main(int argc, char **argv) {
     long        maxX   = (argc > 1) ? strtol(argv[1], nullptr, 10) : 500;       // 0 = until ceiling
     double      cliKmin = (argc > 2) ? strtod(argv[2], nullptr) : 0.0;          // 0 = auto
     const char *spath  = (argc > 3) ? argv[3] : "zzz-loop.state";
-    double      kmin_floor = (argc > 4) ? strtod(argv[4], nullptr) : 3.5;
     const long  W = 32, BATCH = 4000, NMAX = 4000000, LOOKAHEAD = 1024;
 
     auto spv_fwd = load_spv(ZEROMB_SPV);
@@ -154,15 +150,7 @@ int main(int argc, char **argv) {
         if (cliKmin > 0) kmin = cliKmin;                  // explicit kmin overrides resumed
     } else {
         z.assign(SEED, SEED + NSEED);
-        // warm-start the prime list: at tiny x almost every integer is a prime power,
-        // so the contrast detector's local median has no composite floor yet (same
-        // given-seed device as loop.c's --loop-contrast).  These 10 are seed, not claim.
-        static const long WP[] = { 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 };
-        for (long p : WP) { primes.push_back(p); printf("%ld\n", p); }
-        Xknown = WP[sizeof(WP)/sizeof(WP[0]) - 1];
-        fflush(stdout);
-        fprintf(stderr, "loopvk: seeded %ld zeros + 10 warm-start primes (contrast detector); "
-                "zeta-free & primality-free; GPU both ways\n", NSEED);
+        fprintf(stderr, "loopvk: seeded %ld zeros; zeta-free & primality-free; GPU both ways\n", NSEED);
     }
     signal(SIGINT, on_sigint);
     printf("# loopvk: primes from zeros on the GPU (one/line); state=%s\n", spath); fflush(stdout);
@@ -212,15 +200,15 @@ int main(int argc, char **argv) {
         mgr.sequence()->record<kp::OpTensorSyncDevice>({ tZhi, tZlo, tLhi, tLlo })
             ->record<kp::OpAlgoDispatch>(algo)->record<kp::OpTensorSyncLocal>({ tS })->eval();
         std::vector<float> S = tS->vector();
-        double NZb[K], envb[K];                              // per-truncation NZ and envelope
+        double NZb[K], topb[K];                              // per-truncation NZ and its top zero
         for (int k = 0; k < K; ++k) {
             NZb[k] = (k == K-1) ? (double)NZfull : std::floor((0.5 + 0.1*k) * (double)NZfull);
-            envb[k] = ENVK * li(NZb[k] - 4.0);
+            topb[k] = z[(size_t)NZb[k] - 1];
         }
         auto rk = [&](long x, int k) -> double {             // r at truncation k from its prefix sum
             if (x < s0 || x > s1) return 0.0;
             double xx = (double)x, Sk = (double)S[(size_t)(x - s0) * K + k];
-            return (1.0 + 1.0/(xx - xx*xx*xx) - (4.0/sqrt(xx)) * Sk) / (envb[k] * log(xx) / xx);
+            return (1.0 + 1.0/(xx - xx*xx*xx) - (4.0/sqrt(xx)) * Sk) / ((2.0 / M_PI) * topb[k] * log(xx) / xx);   // Landau peak scale, as loop.c
         };
         auto Rmed = [&](long x) -> double {                  // median over the K truncations (wide NZ span)
             double v[K]; for (int k = 0; k < K; ++k) v[k] = rk(x, k);
@@ -239,7 +227,7 @@ int main(int argc, char **argv) {
             int kp = is_known_pow(x);
             bool resolved;
             // same rule as loop.c::backward: lag floor at every x, statistical gate above X_GATE
-            bool inreach = z[(size_t)NZb[0] - 1] >= U_MIN * (double)x;
+            bool inreach = topb[0] >= U_MIN * (double)x;
             if (inreach && x >= X_GATE) {
                 long cnt = 0, tot = 0;                       // reach frac from the LOWEST truncation
                 for (long j = x - GW; j <= x + GW; ++j) { if (j < 2) continue; ++tot; if (Rlow(j) < TAULO) ++cnt; }
@@ -288,8 +276,8 @@ int main(int argc, char **argv) {
         }
     };
 
-    // ---- the loop (auto-anneal, like loop.c) ----
-    long prev_X = Xknown, stalled = 0, best_X = Xknown, no_improve = 0;
+    // ---- the loop ----
+    long prev_X = Xknown, stalled = 0;
     while (!g_stop && (maxX <= 0 || Xknown < maxX)) {
         ++iter;
         // scan from just inside the confirmed frontier up through a generous look-ahead.
@@ -307,19 +295,11 @@ int main(int argc, char **argv) {
                 iter, Xknown, primes.size(), z.size(), kmin);
         if (iter % 8 == 0) save_state(spath, iter, Xknown, kmin);
 
-        if (Xknown > best_X) best_X = Xknown;
         if (Xknown > prev_X) { prev_X = Xknown; stalled = 0; }
-        else if ((long)z.size() >= nt) {
-            if (++stalled >= 2) {
-                no_improve = (Xknown >= best_X) ? 0 : no_improve + 1;
-                if (kmin <= kmin_floor + 1e-9 || no_improve >= 2) {
-                    fprintf(stderr, "loopvk: plain-B ceiling X*=%ld at kmin=%.3f\n", best_X, kmin);
-                    break;
-                }
-                kmin *= 0.9; if (kmin < kmin_floor) kmin = kmin_floor;
-                fprintf(stderr, "loopvk: stalled at X=%ld; annealing kmin -> %.3f\n", Xknown, kmin);
-                stalled = 0; prev_X = -1;
-            }
+        else if ((long)z.size() >= nt && ++stalled >= 2) {
+            fprintf(stderr, "loopvk: stalled at X=%ld -- the zeros that kappa >= %.3f allows do not resolve "
+                    "the next candidate (try a lower kmin)\n", Xknown, kmin);
+            break;
         }
         if ((long)z.size() >= NMAX) { fprintf(stderr, "loopvk: zero cap %ld hit\n", NMAX); break; }
     }
