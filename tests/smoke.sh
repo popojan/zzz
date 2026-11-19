@@ -51,12 +51,11 @@ case $case_ in
         "$bin/zproxy"  10 60 100 50                 > "$tmp" && rows "zproxy grid"  101 "$tmp" || exit 1
         "$bin/zhad"    "$zeros" 10 60 100 1000 20   > "$tmp" && rows "zhad grid"    101 "$tmp" || exit 1
         "$bin/zhybrid" "$zeros" 10 60 100 1000 20   > "$tmp" && rows "zhybrid grid" 101 "$tmp" || exit 1 ;;
-    loop)   # 437 = 19*23 and 18 were once emitted by the last two variants
+    loop)   # an earlier small-x branch emitted 18, 22, 24, ... from the 6-zero seed
         tmp=${TMPDIR:-/tmp}/zzz-smoke.$$; trap 'rm -f "$tmp" "$tmp.st"' EXIT
         L="--loop --loop-fresh --loop-iters 6 --loop-state $tmp.st"
         "$bin/zzz" $L                 > "$tmp" 2>/dev/null && primes "zzz --loop"                 1000 "$tmp" || exit 1
         "$bin/zzz" $L --loop-boxc 0   > "$tmp" 2>/dev/null && primes "zzz --loop --loop-boxc 0"   1000 "$tmp" || exit 1
-        "$bin/zzz" $L --loop-contrast > "$tmp" 2>/dev/null && primes "zzz --loop --loop-contrast" 1000 "$tmp" || exit 1
         "$bin/zzz" $L --loop-seed 6   > "$tmp" 2>/dev/null && primes "zzz --loop --loop-seed 6"    500 "$tmp" || exit 1 ;;
     *) echo "unknown case: $case_"; exit 2 ;;
 esac

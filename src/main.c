@@ -1192,11 +1192,8 @@ static struct argp_option options[] = {
         { "resume", 1001, 0, 0, "--loop: resume from the checkpoint file instead of the seed"},
         { "loop-state", 1002, "FILE", 0, "--loop: checkpoint path [zzz-loop.state]"},
         { "loop-nmax", 1003, "N", 0, "--loop: zero-list cap [2000000]"},
-        { "loop-kmin", 1004, "K", 0, "--loop: starting kappa margin for the forward step [5.0]"},
-        { "loop-kmin-floor", 1005, "K", 0, "--loop: anneal stops at this margin [3.5]"},
-        { "loop-no-anneal", 1006, 0, 0, "--loop: keep kappa fixed (stall at one ceiling) instead of auto-annealing"},
+        { "loop-kmin", 1004, "K", 0, "--loop: kappa margin the forward step must keep [5.0]"},
         { "loop-seed", 1007, "N", 0, "--loop: use only the first N built-in seed zeros (min 6)"},
-        { "loop-contrast", 1008, 0, 0, "--loop: fit-free detector (peak scale from the loop's own top zero instead of the Li envelope)"},
         { "loop-fresh", 1009, 0, 0, "--loop: force a fresh start, ignoring any existing checkpoint"},
         { "loop-batch", 1010, "N", 0, "--loop: zeros per re-detect for smooth streaming [2000; 0=whole frontier]"},
         { "loop-boxc", 1011, "C", 0, "--loop: forward box-smoothing window w = C*gap(t) [0.375; 0 = plain B]"},
@@ -1225,10 +1222,7 @@ struct arguments {
     const char *loop_state;
     slong loop_nmax;
     double loop_kmin;
-    double loop_kmin_floor;
-    slong loop_anneal;
     slong loop_seed;
-    slong loop_contrast;
     slong loop_fresh;
     slong loop_batch;
     double loop_boxc;
@@ -1259,10 +1253,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         case 1002: arguments->loop_state = arg; break;
         case 1003: arguments->loop_nmax = atol(arg); break;
         case 1004: arguments->loop_kmin = atof(arg); break;
-        case 1005: arguments->loop_kmin_floor = atof(arg); break;
-        case 1006: arguments->loop_anneal = 0; break;
         case 1007: arguments->loop_seed = atol(arg); break;
-        case 1008: arguments->loop_contrast = 1; break;
         case 1009: arguments->loop_fresh = 1; break;
         case 1010: arguments->loop_batch = atol(arg); break;
         case 1011: arguments->loop_boxc = atof(arg); break;
@@ -1322,10 +1313,7 @@ int main(int argc, char *argv[])
     arguments.loop_state = NULL;
     arguments.loop_nmax = 0;
     arguments.loop_kmin = 0.0;
-    arguments.loop_kmin_floor = 0.0;
-    arguments.loop_anneal = 1;
     arguments.loop_seed = 0;
-    arguments.loop_contrast = 0;
     arguments.loop_fresh = 0;
     arguments.loop_batch = -1;
     arguments.loop_boxc = -1.0;
@@ -1343,10 +1331,7 @@ int main(int argc, char *argv[])
         if (arguments.loop_state) lo.state_path = arguments.loop_state;
         if (arguments.loop_nmax > 0) lo.nmax_zeros = arguments.loop_nmax;
         if (arguments.loop_kmin > 0.0) { lo.kmin = arguments.loop_kmin; lo.kmin_set = 1; }
-        if (arguments.loop_kmin_floor > 0.0) lo.kmin_floor = arguments.loop_kmin_floor;
-        lo.anneal = arguments.loop_anneal;
         lo.seed_n = arguments.loop_seed;
-        lo.contrast = arguments.loop_contrast;
         lo.fresh = arguments.loop_fresh;
         if (arguments.loop_batch >= 0) lo.batch = arguments.loop_batch;
         if (arguments.loop_boxc >= 0.0) { lo.boxc = arguments.loop_boxc; lo.boxc_set = 1; }

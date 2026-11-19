@@ -5,7 +5,7 @@
 // detects primes (Chebyshev psi' signal) and locates more zeros (method-B
 // partial-Euler sum over the discovered primes), alternating until it is
 // interrupted.  It commits x once the zeros reach ~2*pi*x, so the forward
-// margin stays near kappa = 6.3 and the kmin/anneal stall logic is dormant.
+// margin stays near kappa = 6.3, well above kmin.
 // Pure double precision (heights are modest).  See doc/notes/loop-margins.md
 // (measured margins) and doc/notes/zeros-primes-bootstrap.md (mechanism).
 //
@@ -21,12 +21,9 @@ typedef struct {
     int resume;              // resume from state_path instead of the seed
     long max_iters;          // stop after this many more iterations (0 = until stalled or interrupted)
     long nmax_zeros;         // safety cap on the zero list [2000000]
-    double kmin;             // (starting) kappa margin for the forward step [5.0]
+    double kmin;             // kappa margin the forward step must keep [5.0]
     int kmin_set;            // user passed --loop-kmin (overrides resumed value)
-    double kmin_floor;       // anneal stops here (>~pi keeps plain-B correct) [3.5]
-    int anneal;              // on stall, lower kmin and keep climbing [1]
     long seed_n;             // use only the first seed_n seed zeros (0 = all)
-    int contrast;            // fit-free peak scale (2*gamma_n/pi) instead of the Li envelope
     long batch;              // zeros per re-detect (smooth streaming) [2000; 0=all]
     int fresh;               // force a fresh start, ignoring any checkpoint
     double boxc;             // forward box-smoothing window w = boxc*gap(t) [0.375; 0 = plain B]

@@ -15,7 +15,6 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-#define EULERG 0.57721566490153286061
 
 // ---- seed data (finite, given; not part of the self-paving claim) ----------
 // First 40 nontrivial zero ordinates gamma_n (Im rho).
@@ -33,19 +32,13 @@ static const double SEED[] = {
 };
 #define NSEED ((long)(sizeof(SEED) / sizeof(SEED[0])))
 
-// ---- detector / scale (matched-filter peak-height normalisation) -----------
-// The truncated psi' has a Dirichlet-kernel peak at each prime power of height
-// ~ (gamma_n/2pi) * Lambda(x)/x; with Li(n) ~ gamma_n/2pi this is the envelope
-// below.  Detection = peak as a fraction tau of that expected full-prime height.
-// (The textbook integral int psi' = Lambda fails here: under truncation the +1
-// in psi' is not cancelled and leaves a baseline -- verified to misfire.)
+// ---- detector scale ---------------------------------------------------------
+// The truncated psi' has a Dirichlet-kernel peak at each prime power x; summed over the
+// zeros up to gamma_n its height is Landau's main term (2*gamma_n/pi) * Lambda(x)/x.
+// backward() reads every candidate as a fraction of that full-prime height, with gamma_n
+// the loop's own top zero: no fitted constant.  (The textbook integral int psi' = Lambda
+// fails here: under truncation the +1 in psi' is not cancelled and leaves a baseline.)
 static const double TAULO = 0.12;   // reach gate: "clear composite" level at the lowest truncation
-static const double ENVK  = 20.0 / 4.0;
-// loop_opts.contrast: fit-free normalisation.  The peak of the truncated sum at a prime is
-// Landau's main term (2*gamma_n/pi) * log(x)/x, known from the loop's own top zero, so
-// neither Li nor the empirical 20/4 is needed (5*Li(n-4) ~ 4*gamma_n/2pi to a few % here,
-// drifting to 5:4 asymptotically).
-static int g_fitfree = 0;
 static FILE *g_declog = NULL;       // loop_opts.declog: one line per backward decision
 
 // ---- growable state --------------------------------------------------------
@@ -55,7 +48,7 @@ typedef struct {
     double *lp, *ph;                 // per prime: log p, p^(-1/2) (the forward sum's hot terms)
     long    Xknown;                  // largest x covered by detection
     long    iter;
-    double  kmin;                    // current (annealed) kappa margin
+    double  kmin;                    // kappa margin of the forward step
     double  boxc;                    // boxc recorded in a loaded checkpoint (-1: none)
 } state;
 
@@ -85,18 +78,6 @@ static void p_push(state *st, long x) {           // append (x larger than all)
 }
 
 // ---- math primitives (zeta-free) -------------------------------------------
-static double ei(double zz) {                     // exponential integral, zz>0
-    double s = EULERG + log(zz), t = 1.0;
-    for (int k = 1; k < 400; ++k) {
-        t *= zz / k;
-        double add = t / k;
-        s += add;
-        if (fabs(add) < 1e-15 * fabs(s) && k > zz) break;
-    }
-    return s;
-}
-static double li(double x) { return ei(log(x)); }                 // Li(x)=Ei(ln x)
-
 static int cmp_d(const void *a, const void *b) {
     double d = *(const double *)a - *(const double *)b; return d < 0 ? -1 : d > 0 ? 1 : 0;
 }
@@ -203,10 +184,10 @@ static long backward(state *st, long x_start, long Xcap) {
     long s0 = x_start - GW; if (s0 < 2) s0 = 2;
     long s1 = Xcap + GW, NX = s1 - s0 + 1;
     if (NX < 1) return st->Xknown;
-    long nb[K]; double LiK[K];                            // truncation sizes and peak-height scales
+    long nb[K]; double top[K];                            // truncation sizes and their top zeros
     for (int b = 0; b < K; ++b) { nb[b] = (b == K-1) ? nz : (long)floor(FR[b] * (double)nz);
         if (nb[b] < 6) nb[b] = (nz < 6 ? nz : 6);
-        LiK[b] = g_fitfree ? (2.0 / M_PI) * st->z[nb[b] - 1] : ENVK * li((double)nb[b] - 4.0); }
+        top[b] = st->z[nb[b] - 1]; }
     double *R = malloc((size_t)NX * K * sizeof(double));  // r at each truncation per candidate
     long nfill = 0;                                       // rows [0, nfill) of R are computed
 #define RAT(X,B) (((X) < s0 || (X) > s1) ? 0.0 : R[((X) - s0)*K + (B)])
@@ -222,14 +203,14 @@ static long backward(state *st, long x_start, long Xcap) {
                 long prev = 0;
                 for (int b = 0; b < K; ++b) {
                     for (long k = prev; k < nb[b]; ++k) s += cos(st->z[k] * lx);
-                    R[i*K + b] = (base - c4 * s) / (LiK[b] * lx / xi);
+                    R[i*K + b] = (base - c4 * s) / ((2.0 / M_PI) * top[b] * lx / xi);
                     prev = nb[b];
                 }
             }
             nfill = to;
         }
         int kp = is_known_pow(x, st), resolved;
-        int inreach = st->z[nb[0] - 1] >= U_MIN * (double)x;
+        int inreach = top[0] >= U_MIN * (double)x;
         double frac = 1.0;
         if (inreach && x >= X_GATE) {                    // reach frac from the lowest truncation
             long cnt = 0, tot = 0;
@@ -315,10 +296,7 @@ void loop_opts_default(loop_opts *o) {
     o->nmax_zeros = 2000000;
     o->kmin = 5.0;
     o->kmin_set = 0;
-    o->kmin_floor = 3.5;
-    o->anneal = 1;
     o->seed_n = 0;
-    o->contrast = 0;
     o->batch = 2000;
     o->fresh = 0;
     o->boxc = 0.375;
@@ -336,7 +314,6 @@ static int file_exists(const char *path) {
 int loop_run(const loop_opts *o) {
     state st; memset(&st, 0, sizeof st);
     g_boxc = o->boxc;
-    g_fitfree = o->contrast;
 
     // auto-resume: bare --loop continues from a checkpoint if one is present.
     int resume = o->fresh ? 0 : (o->resume ? 1 : file_exists(o->state_path));
@@ -362,8 +339,7 @@ int loop_run(const loop_opts *o) {
         long ns = (o->seed_n > 0 && o->seed_n < NSEED) ? o->seed_n : NSEED;
         if (ns < 6) { fprintf(stderr, "loop: seed must be >= 6 zeros\n"); return 1; }
         for (long i = 0; i < ns; ++i) z_push(&st, SEED[i]);
-        fprintf(stderr, "loop: seeded with %ld zeros%s; loop is zeta-free and primality-free\n",
-                ns, o->contrast ? " (fit-free peak scale)" : "");
+        fprintf(stderr, "loop: seeded with %ld zeros; loop is zeta-free and primality-free\n", ns);
     }
 
     signal(SIGINT, on_sigint);
@@ -373,7 +349,7 @@ int loop_run(const loop_opts *o) {
     if (o->declog && !(g_declog = fopen(o->declog, resume ? "a" : "w"))) {
         fprintf(stderr, "loop: cannot write %s\n", o->declog); return 1; }
 
-    long prev_X = st.Xknown, stalled = 0, best_X = st.Xknown, no_improve = 0;
+    long prev_X = st.Xknown, stalled = 0;
     long last_iter = o->max_iters > 0 ? st.iter + o->max_iters : 0;
     while (!g_stop && (last_iter == 0 || st.iter < last_iter)) {
         st.iter++;
@@ -399,27 +375,13 @@ int loop_run(const loop_opts *o) {
 
         if (st.iter % 8 == 0) save_state(&st, o->state_path);   // throttle the O(nz) rewrite
 
-        if (st.Xknown > best_X) best_X = st.Xknown;
         if (st.Xknown > prev_X) {                          // progress: reach grew
             prev_X = st.Xknown; stalled = 0;
-        } else if (st.nz >= nt) {                          // forward exhausted, reach flat
-            if (++stalled >= 2) {
-                // fixed point at this kmin: anneal the margin down and keep climbing
-                no_improve = (st.Xknown >= best_X) ? 0 : no_improve + 1;
-                if (!o->anneal || st.kmin <= o->kmin_floor + 1e-9 || no_improve >= 2) {
-                    fprintf(stderr, "loop: %s ceiling reached -- X*=%ld at kmin=%.3f "
-                            "(go further with a %s forward step)\n",
-                            g_boxc > 0.0 ? "box-B" : "plain-B", best_X, st.kmin,
-                            g_boxc > 0.0 ? "Weil" : "box-B/Weil");
-                    break;
-                }
-                st.kmin *= 0.9;
-                if (st.kmin < o->kmin_floor) st.kmin = o->kmin_floor;
-                fprintf(stderr, "loop: stalled at X=%ld; annealing kmin -> %.3f and continuing\n",
-                        st.Xknown, st.kmin);
-                stalled = 0; prev_X = -1;
-            }
-        }                                                  // else: still filling forward
+        } else if (st.nz >= nt && ++stalled >= 2) {        // every zero kmin allows is in, reach flat
+            fprintf(stderr, "loop: stalled at X=%ld -- the zeros that kappa >= %.3f allows do not resolve "
+                    "the next candidate (try a lower --loop-kmin)\n", st.Xknown, st.kmin);
+            break;
+        }
         if (st.nz >= o->nmax_zeros) {
             fprintf(stderr, "loop: hit zero cap %ld; raise --loop-nmax to continue\n", o->nmax_zeros);
             break;
