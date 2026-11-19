@@ -189,6 +189,7 @@ static long backward(state *st, long x_start, long Xcap) {
     const long   X_GATE = 512;       // statistical gate above this (below, the window is power-dense)
     const double TAU_C = 0.40, TAU_LO_M = 0.25;   // median commit / clear-composite thresholds
     const double U_MIN = 2.5;        // lag floor: commit x only while gamma(0.5*NZ) >= U_MIN*x
+    const long   CHUNK = 64;         // candidates evaluated ahead of the scan
     enum { K = 6 };
     static const double FR[K] = { 0.50, 0.60, 0.70, 0.80, 0.90, 1.00 };
     long nz = st->nz;
@@ -201,19 +202,26 @@ static long backward(state *st, long x_start, long Xcap) {
         if (nb[b] < 6) nb[b] = (nz < 6 ? nz : 6);
         LiK[b] = g_fitfree ? (2.0 / M_PI) * st->z[nb[b] - 1] : ENVK * li((double)nb[b] - 4.0); }
     double *R = malloc((size_t)NX * K * sizeof(double));  // r at each truncation per candidate
-    for (long i = 0; i < NX; ++i) {                       // prefix sum: all K truncations in one pass
-        double x = (double)(s0 + i), lx = log(x), s = 0.0;
-        double base = 1.0 + 1.0 / (x - x*x*x), c4 = 4.0 / sqrt(x);
-        long prev = 0;
-        for (int b = 0; b < K; ++b) {
-            for (long k = prev; k < nb[b]; ++k) s += cos(st->z[k] * lx);
-            R[i*K + b] = (base - c4 * s) / (LiK[b] * lx / x);
-            prev = nb[b];
-        }
-    }
+    long nfill = 0;                                       // rows [0, nfill) of R are computed
 #define RAT(X,B) (((X) < s0 || (X) > s1) ? 0.0 : R[((X) - s0)*K + (B)])
     long Xk = x_start - 1;
     for (long x = x_start; x <= Xcap; ++x) {
+        // the scan usually stops long before Xcap, and a row costs a pass over all the
+        // zeros: compute rows only as the scan needs them (x + GW), a chunk at a time
+        if (x + GW - s0 >= nfill) {
+            long to = x + GW - s0 + 1 + CHUNK; if (to > NX) to = NX;
+            for (long i = nfill; i < to; ++i) {           // prefix sum: all K truncations in one pass
+                double xi = (double)(s0 + i), lx = log(xi), s = 0.0;
+                double base = 1.0 + 1.0 / (xi - xi*xi*xi), c4 = 4.0 / sqrt(xi);
+                long prev = 0;
+                for (int b = 0; b < K; ++b) {
+                    for (long k = prev; k < nb[b]; ++k) s += cos(st->z[k] * lx);
+                    R[i*K + b] = (base - c4 * s) / (LiK[b] * lx / xi);
+                    prev = nb[b];
+                }
+            }
+            nfill = to;
+        }
         int kp = is_known_pow(x, st), resolved;
         int inreach = st->z[nb[0] - 1] >= U_MIN * (double)x;
         if (inreach && x >= X_GATE) {                    // reach frac from the lowest truncation
