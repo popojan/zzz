@@ -39,9 +39,13 @@ static const double SEED[] = {
 // below.  Detection = peak as a fraction tau of that expected full-prime height.
 // (The textbook integral int psi' = Lambda fails here: under truncation the +1
 // in psi' is not cancelled and leaves a baseline -- verified to misfire.)
-static const double TAU   = 0.30;   // strong-peak threshold (prime power)
-static const double TAULO = 0.12;   // ambiguous band floor
+static const double TAULO = 0.12;   // reach gate: "clear composite" level at the lowest truncation
 static const double ENVK  = 20.0 / 4.0;
+// loop_opts.contrast: fit-free normalisation.  The peak of the truncated sum at a prime is
+// Landau's main term (2*gamma_n/pi) * log(x)/x, known from the loop's own top zero, so
+// neither Li nor the empirical 20/4 is needed (5*Li(n-4) ~ 4*gamma_n/2pi to a few % here,
+// drifting to 5:4 asymptotically).
+static int g_fitfree = 0;
 
 // ---- growable state --------------------------------------------------------
 typedef struct {
@@ -86,27 +90,8 @@ static double ei(double zz) {                     // exponential integral, zz>0
 }
 static double li(double x) { return ei(log(x)); }                 // Li(x)=Ei(ln x)
 
-// psi'(x) ~ 1 + 1/(x-x^3) - (4/sqrt x) sum_k cos(gamma_k log x)
-static double psi_prime(double x, const double *z, long n) {
-    double lx = log(x), s = 0.0;
-    for (long k = 0; k < n; ++k) s += cos(z[k] * lx);
-    return 1.0 + 1.0 / (x - x * x * x) - (4.0 / sqrt(x)) * s;
-}
-
-// fit-free (CFAR) detector: psi'(x) rises >= C local MADs above the median of its
-// neighbors. No envelope, no Li -- only a dimensionless SNR threshold. Needs a
-// small prime warm-start (at tiny x almost every integer is a prime power, so the
-// local median has no composite floor).
-static const long  SEED_PRIMES[] = {2,3,5,7,11,13,17,19,23,29};
-#define NSEEDP ((long)(sizeof(SEED_PRIMES)/sizeof(SEED_PRIMES[0])))
-static const double CHI = 4.0;   // clear prime power (MADs above local median)
-static const double CLO = 2.0;   // ambiguous band floor
 static int cmp_d(const void *a, const void *b) {
     double d = *(const double *)a - *(const double *)b; return d < 0 ? -1 : d > 0 ? 1 : 0;
-}
-static double median_d(double *v, int m) {
-    qsort(v, m, sizeof(double), cmp_d);
-    return m == 0 ? 0.0 : (m % 2 ? v[m / 2] : 0.5 * (v[m / 2 - 1] + v[m / 2]));
 }
 
 // is x a perfect power p^m (m>=2) of an ALREADY-DISCOVERED prime? (not a primality test)
@@ -196,11 +181,12 @@ static double locate_march(long k, const state *st, long X, double prev) {
 // composites ~-0.05 +- 0.07).  The reach gate finds that point statistically; U_MIN states
 // the requirement outright.  Measured floor (doc/notes/loop-margins.md): below
 // gamma(0.5*NZ) ~ 1.8*x a composite between twin primes rides both main lobes and reads as
-// a prime, at every height; the gate has not let the ratio under 2.8.
+// a prime, at every height; the gate has not let the ratio under 2.8.  Below X_GATE the
+// window is too prime-power-dense for the gate, and the floor alone bounds the reach.
 static long backward(state *st, long x_start, long Xcap) {
     const long   GW = 30;            // reach-gate neighbourhood half-width
     const double FRAC_OK = 0.70;     // clear-composite fraction (lowest truncation) => inside reach
-    const long   X_GATE = 512;       // gate above this; conservative bootstrap below
+    const long   X_GATE = 512;       // statistical gate above this (below, the window is power-dense)
     const double TAU_C = 0.40, TAU_LO_M = 0.25;   // median commit / clear-composite thresholds
     const double U_MIN = 2.5;        // lag floor: commit x only while gamma(0.5*NZ) >= U_MIN*x
     enum { K = 6 };
@@ -210,10 +196,10 @@ static long backward(state *st, long x_start, long Xcap) {
     long s0 = x_start - GW; if (s0 < 2) s0 = 2;
     long s1 = Xcap + GW, NX = s1 - s0 + 1;
     if (NX < 1) return st->Xknown;
-    long nb[K]; double LiK[K];                            // truncation sizes and Li(n-4) factors
+    long nb[K]; double LiK[K];                            // truncation sizes and peak-height scales
     for (int b = 0; b < K; ++b) { nb[b] = (b == K-1) ? nz : (long)floor(FR[b] * (double)nz);
         if (nb[b] < 6) nb[b] = (nz < 6 ? nz : 6);
-        LiK[b] = ENVK * li((double)nb[b] - 4.0); }
+        LiK[b] = g_fitfree ? (2.0 / M_PI) * st->z[nb[b] - 1] : ENVK * li((double)nb[b] - 4.0); }
     double *R = malloc((size_t)NX * K * sizeof(double));  // r at each truncation per candidate
     for (long i = 0; i < NX; ++i) {                       // prefix sum: all K truncations in one pass
         double x = (double)(s0 + i), lx = log(x), s = 0.0;
@@ -229,59 +215,26 @@ static long backward(state *st, long x_start, long Xcap) {
     long Xk = x_start - 1;
     for (long x = x_start; x <= Xcap; ++x) {
         int kp = is_known_pow(x, st), resolved;
-        if (x < X_GATE) {                                // bootstrap: conservative three-zone (full NZ)
-            double rx = RAT(x, K-1);
-            if (rx > TAU)        { if (!kp && !p_has(st, x)) { p_push(st, x); printf("%ld\n", x); fflush(stdout); } resolved = 1; }
-            else if (rx > TAULO) resolved = kp;          // ambiguous: resolved only if known power
-            else                 resolved = 1;           // clear composite
-        } else {
-            long cnt = 0, tot = 0;                       // reach frac from the lowest truncation
+        int inreach = st->z[nb[0] - 1] >= U_MIN * (double)x;
+        if (inreach && x >= X_GATE) {                    // reach frac from the lowest truncation
+            long cnt = 0, tot = 0;
             for (long j = x - GW; j <= x + GW; ++j) { if (j < 2) continue; ++tot; if (RAT(j, 0) < TAULO) ++cnt; }
-            if (st->z[nb[0] - 1] < U_MIN * (double)x || !tot || (double)cnt / (double)tot < FRAC_OK) {
-                resolved = 0;                            // beyond reach(0.5*NZ) -> stop
-            } else {
-                double v[K]; for (int b = 0; b < K; ++b) v[b] = RAT(x, b);
-                qsort(v, K, sizeof(double), cmp_d);
-                double m = 0.5 * (v[K/2 - 1] + v[K/2]);   // median over the K truncations
-                if (m > TAU_C)         { if (!kp && !p_has(st, x)) { p_push(st, x); printf("%ld\n", x); fflush(stdout); } resolved = 1; }
-                else if (m < TAU_LO_M) resolved = 1;     // clear composite
-                else                   resolved = (kp || p_has(st, x));   // ambiguous -> only if known
-            }
+            inreach = tot && (double)cnt / (double)tot >= FRAC_OK;
+        }
+        if (!inreach) {
+            resolved = 0;                                // beyond reach(0.5*NZ) -> stop
+        } else {
+            double v[K]; for (int b = 0; b < K; ++b) v[b] = RAT(x, b);
+            qsort(v, K, sizeof(double), cmp_d);
+            double m = 0.5 * (v[K/2 - 1] + v[K/2]);       // median over the K truncations
+            if (m > TAU_C)         { if (!kp && !p_has(st, x)) { p_push(st, x); printf("%ld\n", x); fflush(stdout); } resolved = 1; }
+            else if (m < TAU_LO_M) resolved = 1;         // clear composite
+            else                   resolved = (kp || p_has(st, x));   // ambiguous -> only if known
         }
         if (resolved) Xk = x; else break;                // contiguous: stop at first unresolved
     }
 #undef RAT
     free(R);
-    return Xk;
-}
-
-// fit-free variant: local-contrast (CFAR) detection, no envelope/Li.
-// psi' is evaluated lazily over the local window only, so cost tracks the scan
-// length (which stops at the reach), not the full [x_start, Xcap] span.
-static long backward_contrast(state *st, long x_start, long Xcap) {
-    long n = st->nz, Xk = x_start - 1;
-    const int W = 6;
-    double buf[2 * W + 2], tmp[2 * W + 2];
-    for (long x = x_start; x <= Xcap; ++x) {
-        int m = 0;
-        for (long j = x - W; j <= x + W; ++j)
-            if (j >= 2 && j != x) buf[m++] = psi_prime((double)j, st->z, n);
-        if (m < 3) { Xk = x; continue; }
-        memcpy(tmp, buf, m * sizeof(double));
-        double base = median_d(tmp, m);
-        for (int i = 0; i < m; ++i) tmp[i] = fabs(buf[i] - base);
-        double mad = median_d(tmp, m);
-        double c = (psi_prime((double)x, st->z, n) - base) / (mad + 1e-9);
-        int kp = is_known_pow(x, st);
-        if (c > CHI) {
-            if (!kp && !p_has(st, x)) { p_push(st, x); printf("%ld\n", x); fflush(stdout); }
-            Xk = x;
-        } else if (c > CLO) {
-            if (kp || p_has(st, x)) Xk = x; else break;    // ambiguous & unknown -> stop
-        } else {
-            Xk = x;
-        }
-    }
     return Xk;
 }
 
@@ -361,6 +314,7 @@ static int file_exists(const char *path) {
 int loop_run(const loop_opts *o) {
     state st; memset(&st, 0, sizeof st);
     g_boxc = o->boxc;
+    g_fitfree = o->contrast;
 
     // auto-resume: bare --loop continues from a checkpoint if one is present.
     int resume = o->fresh ? 0 : (o->resume ? 1 : file_exists(o->state_path));
@@ -375,13 +329,10 @@ int loop_run(const loop_opts *o) {
         if (o->kmin_set) st.kmin = o->kmin;             // explicit --loop-kmin overrides
     } else {
         long ns = (o->seed_n > 0 && o->seed_n < NSEED) ? o->seed_n : NSEED;
-        long nmin = o->contrast ? 2 : 6;     // envelope's Li(n-4) needs n>5
-        if (ns < nmin) { fprintf(stderr, "loop: seed must be >= %ld zeros\n", nmin); return 1; }
+        if (ns < 6) { fprintf(stderr, "loop: seed must be >= 6 zeros\n"); return 1; }
         for (long i = 0; i < ns; ++i) z_push(&st, SEED[i]);
-        if (o->contrast)                     // warm-start the prime list (small x is power-dense)
-            for (long i = 0; i < NSEEDP; ++i) { p_push(&st, SEED_PRIMES[i]); printf("%ld\n", SEED_PRIMES[i]); }
         fprintf(stderr, "loop: seeded with %ld zeros%s; loop is zeta-free and primality-free\n",
-                ns, o->contrast ? " + 10 warm-start primes (contrast detector)" : "");
+                ns, o->contrast ? " (fit-free peak scale)" : "");
     }
 
     signal(SIGINT, on_sigint);
@@ -397,8 +348,7 @@ int loop_run(const loop_opts *o) {
         // shortfall just gets caught up in the next iteration as the frontier grows)
         long x0 = st.Xknown - 16; if (x0 < 2) x0 = 2;
         long Xcap = st.Xknown + 1024;
-        long Xnew = o->contrast ? backward_contrast(&st, x0, Xcap)   // streams new primes
-                                : backward(&st, x0, Xcap);
+        long Xnew = backward(&st, x0, Xcap);               // streams new primes
         if (Xnew > st.Xknown) st.Xknown = Xnew;
 
         // forward only a batch of zeros, so primes stream smoothly (Ctrl+C-able)

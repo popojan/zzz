@@ -1196,7 +1196,7 @@ static struct argp_option options[] = {
         { "loop-kmin-floor", 1005, "K", 0, "--loop: anneal stops at this margin [3.5]"},
         { "loop-no-anneal", 1006, 0, 0, "--loop: keep kappa fixed (stall at one ceiling) instead of auto-annealing"},
         { "loop-seed", 1007, "N", 0, "--loop: use only the first N built-in seed zeros (min 6)"},
-        { "loop-contrast", 1008, 0, 0, "--loop: fit-free local-contrast detector (no Li envelope; warm-starts with 10 primes)"},
+        { "loop-contrast", 1008, 0, 0, "--loop: fit-free detector (peak scale from the loop's own top zero instead of the Li envelope)"},
         { "loop-fresh", 1009, 0, 0, "--loop: force a fresh start, ignoring any existing checkpoint"},
         { "loop-batch", 1010, "N", 0, "--loop: zeros per re-detect for smooth streaming [2000; 0=whole frontier]"},
         { "loop-boxc", 1011, "C", 0, "--loop: forward box-smoothing window w = C*gap(t) [0.375; 0 = plain B]"},

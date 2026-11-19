@@ -18,13 +18,13 @@ typedef struct {
     const char *state_path;  // checkpoint file [zzz-loop.state]
     int resume;              // resume from state_path instead of the seed
     long max_iters;          // 0 = until stalled or interrupted
-    long nmax_zeros;         // safety cap on the zero list [200000]
+    long nmax_zeros;         // safety cap on the zero list [2000000]
     double kmin;             // (starting) kappa margin for the forward step [5.0]
     int kmin_set;            // user passed --loop-kmin (overrides resumed value)
     double kmin_floor;       // anneal stops here (>~pi keeps plain-B correct) [3.5]
     int anneal;              // on stall, lower kmin and keep climbing [1]
     long seed_n;             // use only the first seed_n seed zeros (0 = all)
-    int contrast;            // use the fit-free local-contrast detector (no Li)
+    int contrast;            // fit-free peak scale (2*gamma_n/pi) instead of the Li envelope
     long batch;              // zeros per re-detect (smooth streaming) [2000; 0=all]
     int fresh;               // force a fresh start, ignoring any checkpoint
     double boxc;             // forward box-smoothing window w = boxc*gap(t) [0.375; 0 = plain B]
