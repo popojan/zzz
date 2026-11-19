@@ -190,14 +190,19 @@ static double locate_march(long k, const state *st, long X, double prev) {
 // the MEDIAN per candidate; the truncations are PREFIX SUMS of the same cos series,
 // so one pass over the zeros yields all K (no extra cost).  The frontier advances
 // STRICTLY CONTIGUOUSLY -- it stops at the first unresolved candidate and never
-// leapfrogs one (a skipped prime would be a permanent miss that then corrupts the
-// forward step's zeros).  The committed frontier lags to ~reach(0.5*NZ), so commits
-// happen well inside the reach where the median is bimodal-clean (~0.66 vs ~0.03).
+// leapfrogs one (a skipped prime would be a permanent miss: nothing downstream notices
+// or repairs a wrong list).  Commits happen where even the LOWEST truncation resolves unit
+// spacing, gamma(0.5*NZ) >~ pi*x; there the median is bimodal-clean (primes ~0.8,
+// composites ~-0.05 +- 0.07).  The reach gate finds that point statistically; U_MIN states
+// the requirement outright.  Measured floor (doc/notes/loop-margins.md): below
+// gamma(0.5*NZ) ~ 1.8*x a composite between twin primes rides both main lobes and reads as
+// a prime, at every height; the gate has not let the ratio under 2.8.
 static long backward(state *st, long x_start, long Xcap) {
     const long   GW = 30;            // reach-gate neighbourhood half-width
     const double FRAC_OK = 0.70;     // clear-composite fraction (lowest truncation) => inside reach
     const long   X_GATE = 512;       // gate above this; conservative bootstrap below
     const double TAU_C = 0.40, TAU_LO_M = 0.25;   // median commit / clear-composite thresholds
+    const double U_MIN = 2.5;        // lag floor: commit x only while gamma(0.5*NZ) >= U_MIN*x
     enum { K = 6 };
     static const double FR[K] = { 0.50, 0.60, 0.70, 0.80, 0.90, 1.00 };
     long nz = st->nz;
@@ -232,7 +237,7 @@ static long backward(state *st, long x_start, long Xcap) {
         } else {
             long cnt = 0, tot = 0;                       // reach frac from the lowest truncation
             for (long j = x - GW; j <= x + GW; ++j) { if (j < 2) continue; ++tot; if (RAT(j, 0) < TAULO) ++cnt; }
-            if (!tot || (double)cnt / (double)tot < FRAC_OK) {
+            if (st->z[nb[0] - 1] < U_MIN * (double)x || !tot || (double)cnt / (double)tot < FRAC_OK) {
                 resolved = 0;                            // beyond reach(0.5*NZ) -> stop
             } else {
                 double v[K]; for (int b = 0; b < K; ++b) v[b] = RAT(x, b);
