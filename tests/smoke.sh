@@ -27,6 +27,19 @@ rows() {
               printf("ok   %s: %d numeric rows\n", l, r) }' "$3"
 }
 
+# primes <label> <min_largest> <file>: the --loop stream is exactly the primes up to its largest
+primes() {
+    awk -v l="$1" -v need="$2" '
+        /^#/ || NF == 0 { next }
+        { n++; got[$1] = 1; if ($1 + 0 > mx) mx = $1 + 0 }
+        END { for (i = 2; i <= mx; i++) if (!c[i]) { np++; if (!got[i]) { printf("FAIL %s: prime %d missing\n", l, i); exit 1 }
+                                                     for (j = 2 * i; j <= mx; j += i) c[j] = 1 }
+                                        else if (got[i]) { printf("FAIL %s: composite %d emitted\n", l, i); exit 1 }
+              if (n != np) { printf("FAIL %s: %d lines for %d primes\n", l, n, np); exit 1 }
+              if (mx < need) { printf("FAIL %s: reached only %d, expected >= %d\n", l, mx, need); exit 1 }
+              printf("ok   %s: exactly the %d primes up to %d\n", l, np, mx) }' "$3"
+}
+
 case $case_ in
     zero1) check "zzz 1 (method A, k=100)"     "$("$bin/zzz" 1)"                     $G1    0.01 ;;
     ghy)   check "zzz --ghy -k 300 1000"        "$("$bin/zzz" --ghy -k 300 1000)"     $G1000 0.01 ;;
@@ -38,5 +51,12 @@ case $case_ in
         "$bin/zproxy"  10 60 100 50                 > "$tmp" && rows "zproxy grid"  101 "$tmp" || exit 1
         "$bin/zhad"    "$zeros" 10 60 100 1000 20   > "$tmp" && rows "zhad grid"    101 "$tmp" || exit 1
         "$bin/zhybrid" "$zeros" 10 60 100 1000 20   > "$tmp" && rows "zhybrid grid" 101 "$tmp" || exit 1 ;;
+    loop)   # 437 = 19*23 and 18 were once emitted by the last two variants
+        tmp=${TMPDIR:-/tmp}/zzz-smoke.$$; trap 'rm -f "$tmp" "$tmp.st"' EXIT
+        L="--loop --loop-fresh --loop-iters 6 --loop-state $tmp.st"
+        "$bin/zzz" $L                 > "$tmp" 2>/dev/null && primes "zzz --loop"                 1000 "$tmp" || exit 1
+        "$bin/zzz" $L --loop-boxc 0   > "$tmp" 2>/dev/null && primes "zzz --loop --loop-boxc 0"   1000 "$tmp" || exit 1
+        "$bin/zzz" $L --loop-contrast > "$tmp" 2>/dev/null && primes "zzz --loop --loop-contrast" 1000 "$tmp" || exit 1
+        "$bin/zzz" $L --loop-seed 6   > "$tmp" 2>/dev/null && primes "zzz --loop --loop-seed 6"    500 "$tmp" || exit 1 ;;
     *) echo "unknown case: $case_"; exit 2 ;;
 esac

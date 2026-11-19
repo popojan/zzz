@@ -53,9 +53,9 @@ foreach(_t ghy zzz zproxy zghy zhad zhybrid)
     target_compile_options(${_t} PRIVATE -funroll-loops -Wall -Wextra -Wno-missing-field-initializers)
 endforeach()
 
-# ---- smoke tests: `ctest --test-dir build` (~6 s) --------------------------
+# ---- smoke tests: `ctest --test-dir build` (~12 s) -------------------------
 enable_testing()
-foreach(_case zero1 ghy boot weil grids)
+foreach(_case zero1 ghy boot weil grids loop)
     add_test(NAME smoke.${_case}
              COMMAND sh ${PROJECT_SOURCE_DIR}/tests/smoke.sh ${_case}
                      $<TARGET_FILE_DIR:zzz> ${PROJECT_SOURCE_DIR}/doc/ghy/first-20-zeros.txt)
