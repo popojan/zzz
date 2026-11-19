@@ -65,6 +65,15 @@ needed at this scale.
 
 ## Sustainability as the heights climb (the asymptotics)
 
+> **Status (2026-11): this section and the next describe the prototype, not the
+> current `--loop`.** They rest on the measured reach of the *single-truncation*
+> detector, $X\sim n^{0.5}$. Since the truncation-median detector (2026-06-23) the
+> loop commits at $X\approx T/2\pi$, i.e. $X\propto n/\log n$: the forward margin
+> sits at $\kappa\approx6.3$, `kmin` never binds, and no anneal or ceiling occurs
+> (fresh run to $X=3.5\times10^4$). What limits the loop, and what does not, is
+> measured in [`loop-margins.md`](loop-margins.md). The analysis below stays as the
+> record of why a reach of $n^{0.5}$ *would* stall.
+
 The $\kappa$-margin that makes the demo work does **not** scale. To hold
 $\kappa\ge\kappa_{\min}$ at the frontier zero (index $n$) needs
 $X\gtrsim n^{\kappa_{\min}/2\pi}$, while the backward step *supplies* only
@@ -114,7 +123,7 @@ primes, checkpoints for `--loop --resume`, and catches Ctrl+C. Verified: every s
 correct (zero false positives), confirming the contraction map empirically — $X^\*(\mathrm{kmin}{=}5)=104$,
 $X^\*(\mathrm{kmin}{=}4)>503$ (96 primes). Lowering the margin raises the ceiling, exactly as predicted.
 
-**Auto-annealing (default).** Rather than make the user re-launch with a smaller margin at each
+**Auto-annealing (default; dormant since the median detector, see the status note above).** Rather than make the user re-launch with a smaller margin at each
 ceiling, `--loop` automatically lowers $\mathrm{kmin}$ (×0.9) whenever it stalls, down to a floor
 (`--loop-kmin-floor`, default 3.5, kept above $\pi$ so plain-B stays correct) — so one invocation
 climbs through successive ceilings on its own and stops at the plain-B wall with an honest message
@@ -132,33 +141,43 @@ cheap). `--loop-fresh` forces a fresh start; `--resume` is the explicit form (er
 checkpoint). Verified end-to-end: interrupt at X=1293, relaunch, auto-resume to X=1643 — 259 primes,
 all correct.
 
-**Two detectors (A/B).** Same budget, both with **zero false positives**:
+**Two peak scales (A/B).** Same detector, same thresholds; only the normalisation differs:
 
-| detector | fitted constant | primes | reach X | min seed |
-|---|---|---|---|---|
-| envelope (default) | Li form + 20/4 (matched-filter peak scale) | 65 | 313 | 6 zeros, 0 primes |
-| `--loop-contrast` | **none** (dimensionless SNR threshold) | 34 | 139 | 6 zeros + ~10 primes |
+| scale | fitted constant | min seed |
+|---|---|---|
+| envelope (default) | Li form + 20/4 (matched-filter peak scale) | 6 zeros, 0 primes |
+| `--loop-contrast` | **none**: Landau's main term $\tfrac{2}{\pi}\gamma_n\,\tfrac{\log x}{x}$ from the loop's own top zero | 6 zeros, 0 primes |
 
-The contrast (CFAR) filter proves the loop runs **without the Li envelope** — only a fit-free SNR
-threshold — at ~2× less reach per budget (its local-MAD scale is noisier near the limit than the
-envelope's absolute peak-height law). Soundness of the envelope rests not on its tuned constant but
-on two *provable* facts: composites have $\psi'\approx0$ structurally, and the truncation turns each
+Both give exactly the primes from every seed size 6…40 (`ctest`, `smoke.loop`). The fit-free scale
+shows the loop needs **neither Li nor the 20/4** — $5\,\mathrm{Li}(n-4)\approx4\gamma_n/2\pi$ to a few
+percent at these heights (the Li form drifts to $5:4$ asymptotically; the fit-free one does not).
+*History:* until 2026-11 `--loop-contrast` was a local-MAD (CFAR) detector. Its threshold was
+relative to the composite noise rather than to the prime peak, so its false-alarm rate per candidate
+was fixed, and it emitted $437=19\cdot23$ from a fresh start; it was replaced, not tuned. Soundness
+of the envelope rests not on its tuned constant but on two *provable* facts: composites have $\psi'\approx0$ structurally, and the truncation turns each
 prime-power delta into a Dirichlet-kernel peak of height $\propto\gamma_n\log x/x$ (and
 $\mathrm{Li}(n)\approx\gamma_n/2\pi$). The naive textbook detector $\int\psi'=\Lambda$ *fails* under
 truncation (the uncancelled $+1$ baseline), so the matched-filter normalisation is doing real work.
 
 **Minimum seed.** The pure "1 zero + {2,3}" is below the floor: one zero is a single cosine and
-locates no prime; the explicit-formula sum needs a *handful* (~6) to resolve even x=2,3. The
-contrast detector additionally needs ~10 warm-start primes because at small x almost every integer
-*is* a prime power (no composite floor for the local median) — structural, not tuning. So the
-irreducible seed is "~6 zeros + one normalisation handle" (absolute scale, or ~10 warm primes).
+locates no prime; the explicit-formula sum needs a *handful* (~6) to resolve even x=2,3. A small
+seed must also not be over-read: six zeros ($\gamma\le37.6$) resolve only $x\lesssim15$, and until
+2026-11 the small-$x$ branch had no such limit (`--loop-seed 6` emitted 18, 22, 24, …). The lag
+floor $\gamma(0.5\,N_Z)\ge2.5\,x$ now applies at every $x$. So the irreducible seed is "~6 zeros",
+with the peak scale read off the zeros themselves.
 
-**Verdict.** Informationally consistent and **asymptotically critical**: the loop
+**Verdict (prototype, 2026-06).** Informationally consistent and **asymptotically critical**: the loop
 self-paves and the prime bound grows for as long as the zero supply grows, but it
 converges to the band-saturation / $\sqrt T$ wall rather than outrunning it. Not
 doomed at any finite height (Weil extends the affordable range); not a free
 explosive ladder. Integer-snapping plus a $\kappa$ margin put plain-B on the
 growing side for the demonstrated stretch.
+
+**Verdict (current loop, 2026-11).** With the median detector the loop does not
+approach that wall at all: it holds $X\approx T/2\pi$ against a requirement of
+$X\gtrsim(T/2\pi)^{0.8}$, the per-decision margin grows like $\sqrt{\log x}$, and
+nothing measured points to a failure height. It is not a theorem, and the cost
+grows like $X^2\log^2X$. Evidence: [`loop-margins.md`](loop-margins.md).
 
 ## Artifact index
 
@@ -167,3 +186,5 @@ Scripts/TSVs under `doc/ghy/`: `bootstrap-backward.{wls,tsv}` (reach),
 `bootstrap-closeloop.{wls,tsv}` (B vs Weil-model), `bootstrap-selfpave.{wls,tsv}`
 (the pure demo). Origin: `~/Documents/Wolfram/2023-10-27_psi_derivative_primepi.nb`
 ($\psi'$ kernel `dPsiCosLRH`, envelope). C port: `loop.c` (`zzz --loop`).
+Margins of the current loop: `loop-margins.py`, `loop-replay.py`, `loop-fixed-cutoff.{c,py}`,
+`loop-refzeros.c` + `loop-zero-accuracy.py` (see [`loop-margins.md`](loop-margins.md)).

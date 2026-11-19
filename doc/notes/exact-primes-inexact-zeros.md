@@ -108,6 +108,11 @@ $X\sim10^7$: tens of GB, $\sim10^{16}$ ops), and, if compute were free, at
 **double-precision phase folding** ($T\sim10^{13}$). The wall is real; it is
 simply not on the loop's road.
 
+*Update 2026-11:* measured on the current loop, $X\approx T/(2\pi\cdot0.9)\approx0.18\,T$,
+and its zeros sit within $0.025$ of a mean gap (rms) of the true ones — "gap-scale"
+above means a fixed fraction of the gap, not a full gap. Margins and the one
+condition that must hold forever: [`loop-margins.md`](loop-margins.md).
+
 ## What still needs the exact zeros (scope, so this is not oversold)
 
 The *discrete* fact "$n$ is prime" does not need them. The *continuum* does:

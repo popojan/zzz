@@ -123,12 +123,14 @@ $ ./zzz --loop | head     # primes derived from zeros; Ctrl+C anytime, rerun to 
 ...
 ```
 
-It is a *demonstration* (plain method-B forward, double precision, modest
-heights): the prime bound grows super-critically for a finite stretch, gated by
-the band-saturation $\sqrt{T/2\pi}$ wall, not by precision. A fit-free
-local-contrast detector (`--loop-contrast`) drops even the empirical $\psi'$
-envelope. Mechanism, the contraction-map ceiling, the detector A/B and the
-seed-count limits: [`doc/notes/zeros-primes-bootstrap.md`](doc/notes/zeros-primes-bootstrap.md).
+It is a *demonstration* (box-smoothed method-B forward, double precision, modest
+heights). It commits a candidate $x$ once its zeros reach $T\approx2\pi x$, far
+above the band-saturation curve $X=\sqrt{T/2\pi}$, so that wall is not what
+limits it: the margin on each prime/composite decision grows with height, and what
+ends a run is cost, $\sim X^2\log^2X$. `--loop-contrast` replaces the empirical
+$\psi'$ envelope by a fit-free peak scale. Measured margins and what would break
+them: [`doc/notes/loop-margins.md`](doc/notes/loop-margins.md); mechanism, history
+and seed limits: [`doc/notes/zeros-primes-bootstrap.md`](doc/notes/zeros-primes-bootstrap.md).
 
 **Live GPU demo.** The whole loop runs in-shader (fp32, 40-zero seed, no sieve,
 no ζ) on Shadertoy: <https://www.shadertoy.com/view/s3BSzD> — source and setup

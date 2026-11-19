@@ -3,9 +3,11 @@
 // Demonstrates the explicit formula running in a closed loop with NO zeta
 // evaluation and NO primality test: from a finite seed of zero ordinates it
 // detects primes (Chebyshev psi' signal) and locates more zeros (method-B
-// partial-Euler sum over the discovered primes), alternating until the kappa
-// margin erodes (it stalls) or it is interrupted.  Pure double precision
-// (heights are modest).  See doc/notes/zeros-primes-bootstrap.md.
+// partial-Euler sum over the discovered primes), alternating until it is
+// interrupted.  It commits x once the zeros reach ~2*pi*x, so the forward
+// margin stays near kappa = 6.3 and the kmin/anneal stall logic is dormant.
+// Pure double precision (heights are modest).  See doc/notes/loop-margins.md
+// (measured margins) and doc/notes/zeros-primes-bootstrap.md (mechanism).
 //
 // Streams newly discovered primes to stdout, a trajectory to stderr, and
 // checkpoints full state to a file so --resume can continue (Ctrl+C is caught
