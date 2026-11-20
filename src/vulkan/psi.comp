@@ -1,0 +1,97 @@
+#version 450
+// psi.comp -- backward step of the loop (zeros -> primes), on the GPU.
+//
+// One workgroup per candidate integer x; the 256 threads cooperatively reduce the
+// Chebyshev psi' signal sum_k cos(gamma_k log x) over the zeros, at KB=6 gamma_max
+// truncations (prefix sums of the same additive series, emitted in ONE sweep), and
+// the host medians them to kill single-NZ Dirichlet-sidelobe variance.
+//
+// DF32 PHASE: past gamma_max ~ 1e6 a float32 phase gamma*log(x) loses all precision
+// (the product is ~1e7, and float32 has ~1e-7 relative => ~1 rad of noise), so the
+// detector stalls (~X 1.8e5).  Here the phase is carried in TWO-FLOAT (hi+lo) form:
+// gamma is split (z_hi+z_lo), log(x) is split on the host (lxhi+lxlo, computed in
+// fp64), the product gamma*log(x) is a df32 multiply, and the mod-2pi reduction is
+// done in df32 -- giving ~5e-7 rad accuracy at gamma~1e6 (good past gamma~1e10).
+
+layout(local_size_x = 256) in;
+const uint WG = 256u;
+const uint KB = 6u;                       // number of NZ truncations (0.5,0.6,...,1.0)
+
+layout(std430, binding = 0) readonly  buffer Zhi { float zhi[]; };  // gamma_k high part
+layout(std430, binding = 1) readonly  buffer Zlo { float zlo[]; };  // gamma_k low part (residual)
+layout(std430, binding = 2) readonly  buffer Lhi { float lxhi[]; }; // log(x) high part, per candidate
+layout(std430, binding = 3) readonly  buffer Llo { float lxlo[]; }; // log(x) low part,  per candidate
+layout(std430, binding = 4) writeonly buffer Out { float S[]; };    // NX*KB cumulative cos-sums
+
+layout(push_constant) uniform PC {
+    uint  NZ;      // number of zeros (full)
+    uint  X0;      // first candidate integer (unused; x not needed, lx is supplied)
+    uint  NX;      // number of candidates
+    uint  KB;      // truncations (KB fixed = 6; kept for struct match)
+} pc;
+
+const vec2  TWO_PI_DF  = vec2(6.28318548, -1.748455531e-07);   // 2*pi as df32 (hi, lo)
+const float INV_TWO_PI = 0.159154937;
+
+shared vec2 red[WG];
+
+// ---- two-float (df32) primitives ------------------------------------------------
+// `precise` is ESSENTIAL: error-free transforms rely on exact IEEE rounding, and the
+// shader compiler's default fast-math (reassociation / a*b+c contraction) would zero
+// the error terms -> df32 silently collapses to fp32 (the exact failure at gamma>1e6).
+vec2 twoSum(float a, float b)  { precise float s = a + b; precise float z = s - a;
+                                 precise float e = (a - (s - z)) + (b - z); return vec2(s, e); }
+// exact a*b = p + err via Dekker's 2^12+1 splitting (no fma() dependency).
+vec2 split12(float a)          { precise float c = 4097.0 * a; precise float h = c - (c - a);
+                                 return vec2(h, a - h); }
+vec2 twoProd(float a, float b) {
+    precise float p = a * b;
+    vec2 sa = split12(a), sb = split12(b);
+    precise float e = ((sa.x*sb.x - p) + sa.x*sb.y + sa.y*sb.x) + sa.y*sb.y;
+    return vec2(p, e);
+}
+vec2 dfAdd(vec2 a, float c)    { vec2 s = twoSum(a.x, c);   return twoSum(s.x, s.y + a.y); }
+vec2 dfAddDf(vec2 a, vec2 b)   { vec2 s = twoSum(a.x, b.x); return twoSum(s.x, s.y + a.y + b.y); }
+vec2 dfMul(vec2 a, vec2 b)     { vec2 p = twoProd(a.x, b.x); p.y += a.x*b.y + a.y*b.x; return twoSum(p.x, p.y); }
+vec2 dfMulf(vec2 a, float b)   { vec2 p = twoProd(a.x, b);   p.y += a.y*b;             return twoSum(p.x, p.y); }
+vec2 dfSub(vec2 a, vec2 b)     { vec2 s = twoSum(a.x, -b.x); s.y += a.y - b.y;         return twoSum(s.x, s.y); }
+
+// gamma*log(x) mod 2pi, all in df32 -> small angle for cos
+float reducedPhase(vec2 gamma, vec2 lx) {
+    vec2 phase = dfMul(gamma, lx);                            // ~1e7, df32
+    float q = floor((phase.x + phase.y) * INV_TWO_PI + 0.5);  // nearest integer (exact in f32, q < 2^24)
+    vec2 r = dfSub(phase, dfMulf(TWO_PI_DF, q));              // phase - q*2pi  (df32 cancellation)
+    return r.x + r.y;                                         // in (-pi, pi]
+}
+
+void main() {
+    uint g = gl_WorkGroupID.x;
+    if (g >= pc.NX) return;
+    uint lid = gl_LocalInvocationID.x;
+    vec2 lx = vec2(lxhi[g], lxlo[g]);                         // log(x) as df32 (from host fp64)
+
+    vec2 cum = vec2(0.0, 0.0);             // running cumulative sum (df32), maintained by lid 0
+    uint lo = 0u;
+    for (uint b = 0u; b < KB; ++b) {
+        float fr = 0.5 + 0.1 * float(b);                       // 0.5, 0.6, ..., 1.0
+        uint hi = (b == KB - 1u) ? pc.NZ : uint(fr * float(pc.NZ));
+        if (hi > pc.NZ) hi = pc.NZ;
+        vec2 Sb = vec2(0.0, 0.0);                              // this block's partial sum
+        for (uint k = lo + lid; k < hi; k += WG) {
+            float ph = reducedPhase(vec2(zhi[k], zlo[k]), lx);
+            Sb = dfAdd(Sb, cos(ph));
+        }
+        red[lid] = Sb;
+        barrier();
+        for (uint s = WG / 2u; s > 0u; s >>= 1) {
+            if (lid < s) red[lid] = dfAddDf(red[lid], red[lid + s]);
+            barrier();
+        }
+        if (lid == 0u) {                                       // accumulate block into cumulative, emit
+            cum = dfAddDf(cum, red[0]);
+            S[g * KB + b] = cum.x + cum.y;
+        }
+        barrier();                                             // before next block reuses red[]
+        lo = hi;
+    }
+}

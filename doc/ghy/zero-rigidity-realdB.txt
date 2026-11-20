@@ -1,0 +1,13 @@
+# ZERO-RIGIDITY vs REAL below-threshold B error  (block n=24001..36000, gamma~25755.3, gap=0.755)
+# denoiser corrected = 1 - ||denoised-truth||/||B-truth|| (1=fully fixed, 0=blind)
+
+  X   pi(X)  kappa   SD(d_B)/gap   B_err_t   corrected
+29   10     2.54    0.1403        0.1060    0.021
+49   15     2.94    0.1250        0.0944    0.031
+64   18     3.14    0.1189        0.0898    0.035
+121  30     3.62    0.1061        0.0802    0.065
+256  54     4.19    0.0965        0.0729    0.106
+
+# kappa<pi(=3.14) rows are BELOW the band-saturation wall.
+# If 'corrected' is materially >0 there, the rigidity prior removes part of the
+# REAL B error that prime-only estimators provably cannot -> decisive POSITIVE.

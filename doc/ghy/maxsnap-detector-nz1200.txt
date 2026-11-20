@@ -1,0 +1,32 @@
+# MAX-SNAP-MARGIN detector  (nz=1200 zeros, gamma<=1648.27, scan 2..300, reps=20)
+# median clean reach (largest flawless X) vs injected zero noise eps
+
+eps        Dirichlet      Fejer       Hann      Gauss
+0.000            300        300        300        300
+0.010            300        300        300        300
+0.020            300        300        300        300
+0.030            300        300        300        300
+0.040            300        300        300        300
+0.050            300        300        300        300
+0.070            300        300        300        300
+0.100            201        300        287        287
+0.150            131        156        128        131
+0.200             95         86         78         74
+
+# snap margin  eps*(X) = largest eps holding median reach >= X
+X          Dirichlet      Fejer       Hann      Gauss
+40             0.200      0.200      0.200      0.200
+80             0.200      0.200      0.150      0.150
+120            0.150      0.150      0.150      0.150
+160            0.100      0.100      0.100      0.100
+200            0.100      0.100      0.100      0.100
+250            0.070      0.100      0.100      0.100
+
+# reach at eps=0 (resolution limit) and eps=0.036 (loop native error)
+window      reach@0   reach@.036
+Dirichlet       300          300
+Fejer           300          300
+Hann            300          300
+Gauss           300          300
+
+# wrote /home/jan/github/zzz/doc/ghy/maxsnap-detector.tsv

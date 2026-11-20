@@ -1,0 +1,27 @@
+prime powers: 10110
+=== Part 1: in-band fit at 10^22+5000, k=10^4, gap*a = 1.55
+B seeds: offsets 4850..5150
+fit zeros M=178  far fixed: 120
+57 frequencies, 114 functionals
+  GN iter 1: |r| = ScientificForm[0.0015897141150202998, 3]  max|dx| = ScientificForm[0.003831292809855217, 3]
+  GN iter 2: |r| = ScientificForm[3.350842457436824*^-6, 3]  max|dx| = ScientificForm[0.000034896415822721436, 3]
+  GN iter 3: |r| = ScientificForm[3.3484785814621195*^-6, 3]  max|dx| = ScientificForm[1.5246456764978277*^-7, 3]
+  GN iter 4: |r| = ScientificForm[3.3484785805826537*^-6, 3]  max|dx| = ScientificForm[1.638353001975107*^-9, 3]
+  GN iter 5: |r| = ScientificForm[3.348478577338757*^-6, 3]  max|dx| = ScientificForm[1.933169404691766*^-11, 3]
+  GN iter 6: |r| = ScientificForm[3.34847858166473*^-6, 3]  max|dx| = ScientificForm[2.4829957209333497*^-11, 3]
+  GN iter 7: |r| = ScientificForm[3.3484785785206697*^-6, 3]  max|dx| = ScientificForm[3.927889328959558*^-11, 3]
+  GN iter 8: |r| = ScientificForm[3.348478576605018*^-6, 3]  max|dx| = ScientificForm[2.0873635947991378*^-11, 3]
+  GN iter 9: |r| = ScientificForm[3.3484785753968287*^-6, 3]  max|dx| = ScientificForm[3.5165736653227425*^-11, 3]
+  GN iter 10: |r| = ScientificForm[3.3484785838736168*^-6, 3]  max|dx| = ScientificForm[6.060846940062469*^-11, 3]
+  GN iter 11: |r| = ScientificForm[3.348478577796048*^-6, 3]  max|dx| = ScientificForm[6.66678526869107*^-11, 3]
+  GN iter 12: |r| = ScientificForm[3.3484785796003135*^-6, 3]  max|dx| = ScientificForm[5.617460343893575*^-11, 3]
+  GN iter 13: |r| = ScientificForm[3.348478578909341*^-6, 3]  max|dx| = ScientificForm[4.4843573925179205*^-11, 3]
+  GN iter 14: |r| = ScientificForm[3.3484785789567705*^-6, 3]  max|dx| = ScientificForm[5.263083660785853*^-11, 3]
+  GN iter 15: |r| = ScientificForm[3.348478579391323*^-6, 3]  max|dx| = ScientificForm[3.100094849614*^-11, 3]
+  GN iter 16: |r| = ScientificForm[3.348478580523793*^-6, 3]  max|dx| = ScientificForm[5.562778558905857*^-11, 3]
+central zone (60 zeros):
+  B    mean|err| = ScientificForm[0.0164965841666666666666666666666666666665930957666328819938`27.60726463846866, 4]   max = ScientificForm[0.05051715`28.05651899466944, 3]
+  fit  mean|err| = ScientificForm[0.016591242666267082, 4]   max = ScientificForm[0.051379347578137224, 3]
+  gain = 0.994294670899313x   (true-seed ceiling 3.5x, B abs 0.0119)
+control |r|:  at fit = ScientificForm[3.348478580523793*^-6, 4]   at TRUTH = ScientificForm[4.972208816584384*^-6, 4]   at B = ScientificForm[0.5282467293313144, 4]
+corr(fit err, B err) central = 0.9993305166165593

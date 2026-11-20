@@ -1,0 +1,39 @@
+# BACKWARD REACH EXPONENT  (exact zeros, envelope detector, tau=0.30)
+#   information ceiling (explicit-formula Nyquist): reach ~ gamma_n  (frac -> O(1))
+
+n        gamma_n     reach x_max   x_max/gamma_n   alpha(local)
+500      811.2       309           0.3809          
+1000     1419.4      599           0.4220              599
+Log[---]
+    309
+--------
+ Log[2]
+2000     2515.3      1009          0.4011              1009
+Log[----]
+    599
+---------
+ Log[2]
+4000     4506.3      1665          0.3695              1665
+Log[----]
+    1009
+---------
+ Log[2]
+8000     8148.2      3119          0.3828              3119
+Log[----]
+    1665
+---------
+ Log[2]
+16000    14852.5     5231          0.3522              5231
+Log[----]
+    3119
+---------
+ Log[2]
+32000    27260.2     6000(cap)     0.2201              6000
+Log[----]
+    5231
+---------
+ Log[2]
+
+# global fit:  x_max ~ n^alpha,  alpha = 0.740
+# alpha > 0.5  => loop super-critical at kappa=pi (frontier shifts unboundedly).
+# x_max/gamma_n << 1  => detector-limited, NOT information-limited: slack remains.
