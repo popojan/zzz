@@ -35,13 +35,13 @@ From the single prime 2 the number line grows on its own; primes light up green
 as the loop discovers them, the current one flares, its value prints.
 
 ## Knobs
-- Buffer A: `BATCH` zeros/frame, `BAND` frontier/frame (bootstrap speed); `NLIM`
-  zero cap (8000 → primes to 1502, 16000 → 2716, 60000 → 8585; raise carefully —
-  deep zeros lengthen the detector sum and can trip the browser's shader time limit).
-- Buffer B: `NVIS` zeros in the background trace — now cheap (computed once per
-  column), so you can push it high for razor spikes, or low for gentler ones.
-- Common: `HOLD` seconds per prime; `DTAU`, `UMIN`, `BOXC` are the decision rule — rerun
-  `stage2-sim.c` before changing them.
+- Common: `NLIM` zero cap, shared by both buffers (8000 → primes to 1502, 16000 → 2716,
+  60000 → 8585; raise carefully — deep zeros lengthen the detector sum and can trip the
+  browser's shader time limit). `HOLD` seconds per prime. `DTAU`, `UMIN`, `BOXC` are the
+  decision rule — rerun `stage2-sim.c` before changing them.
+- Buffer A: `BATCH` zeros/frame, `BAND` frontier/frame (bootstrap speed).
+- Buffer B has no knob: the trace sums `2.8·xHi + 128` zeros (capped at `nz`), enough to
+  resolve the visible window at any depth.
 
 ## Status
 Stage 1 (`primes-from-zeros.glsl`) is the baked-snapshot renderer (verified).

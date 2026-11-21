@@ -20,7 +20,8 @@ const float UMIN = 3.0;      // lag floor: decide x only while gamma(nz/2) >= UM
 const float BOXC = 0.375;    // forward box-smoothing window, in mean gaps (0 = plain B)
 const int   STRIDE = 256;    // texels per row of state
 const int   ZBASE  = 0;      // zeros start at linear index 0 (.r channel)
-const int   NZMAX  = 60000;  // zero-list cap
+const int   NLIM   = 8000;   // zero-list cap (=> primes to 1502 = gamma(NLIM/2)/UMIN); raise carefully --
+                             // deep zeros lengthen the detector sum (shader time limit)
 const float KFIX   = 5.0;    // kappa margin (fixed; over-supplied, robust)
 
 ivec2 idx2(int i){ return ivec2(i % STRIDE, i / STRIDE); }
@@ -45,7 +46,7 @@ int nFrontier(int X, float kmin){
     if(X<2) return 0;
     float T=TWO_PI*pow(float(X), TWO_PI/kmin), u=T/TWO_PI;
     float n=floor(u*(log(u)-1.0));
-    return (n>float(NZMAX-2))? NZMAX-2 : int(n);
+    return (n>float(NLIM))? NLIM : int(n);
 }
 
 const float HOLD = 1.2;     // seconds each prime is held on screen

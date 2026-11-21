@@ -6,12 +6,10 @@
  *  is one full reading for display; Buffer A decides on the median of six
  *  truncations. Also stashes the scroll window in .gba.
  */
-const int NTRACE = 8000;  // trace zero-count cap (matches Buffer A's NLIM)
-
 // n = zeros to sum, chosen by the caller to resolve the current window.
 float RdetVis(float x, int n){
     float lx=log(x), s=0.0, top=1.0;
-    for(int k=0;k<NTRACE;k++){ if(k>=n) break; top=texelFetch(iChannel0, idx2(k),0).r; s += pcos(top * lx); }
+    for(int k=0;k<NLIM;k++){ if(k>=n) break; top=texelFetch(iChannel0, idx2(k),0).r; s += pcos(top * lx); }
     float psi = 1.0 + 1.0/(x - x*x*x) - (4.0/sqrt(x))*s;
     return psi/peakf(x, top);
 }
