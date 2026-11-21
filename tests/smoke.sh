@@ -51,11 +51,12 @@ case $case_ in
         "$bin/zproxy"  10 60 100 50                 > "$tmp" && rows "zproxy grid"  101 "$tmp" || exit 1
         "$bin/zhad"    "$zeros" 10 60 100 1000 20   > "$tmp" && rows "zhad grid"    101 "$tmp" || exit 1
         "$bin/zhybrid" "$zeros" 10 60 100 1000 20   > "$tmp" && rows "zhybrid grid" 101 "$tmp" || exit 1 ;;
-    loop)   # an earlier small-x branch emitted 18, 22, 24, ... from the 6-zero seed
+    loop)   # default: no seed zeros; an earlier small-x branch emitted 18, 22, 24, ... from 6 seed zeros
         tmp=${TMPDIR:-/tmp}/zzz-smoke.$$; trap 'rm -f "$tmp" "$tmp.st"' EXIT
-        L="--loop --loop-fresh --loop-iters 6 --loop-state $tmp.st"
+        L="--loop --loop-fresh --loop-iters 8 --loop-state $tmp.st"
         "$bin/zzz" $L                 > "$tmp" 2>/dev/null && primes "zzz --loop"                 1000 "$tmp" || exit 1
         "$bin/zzz" $L --loop-boxc 0   > "$tmp" 2>/dev/null && primes "zzz --loop --loop-boxc 0"   1000 "$tmp" || exit 1
-        "$bin/zzz" $L --loop-seed 6   > "$tmp" 2>/dev/null && primes "zzz --loop --loop-seed 6"    500 "$tmp" || exit 1 ;;
+        "$bin/zzz" $L --loop-seed 6   > "$tmp" 2>/dev/null && primes "zzz --loop --loop-seed 6"   1000 "$tmp" || exit 1
+        "$bin/zzz" $L --loop-seed 40  > "$tmp" 2>/dev/null && primes "zzz --loop --loop-seed 40"  1000 "$tmp" || exit 1 ;;
     *) echo "unknown case: $case_"; exit 2 ;;
 esac

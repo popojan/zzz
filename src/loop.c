@@ -16,7 +16,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// ---- seed data (finite, given; not part of the self-paving claim) ----------
+// ---- optional seed (--loop-seed N; the default start needs none) ---------------
 // First 40 nontrivial zero ordinates gamma_n (Im rho).
 static const double SEED[] = {
     14.134725141734694, 21.022039638771555, 25.010857580145686, 30.424876125859523,
@@ -186,7 +186,7 @@ static long backward(state *st, long x_start, long Xcap) {
     if (NX < 1) return st->Xknown;
     long nb[K]; double top[K];                            // truncation sizes and their top zeros
     for (int b = 0; b < K; ++b) { nb[b] = (b == K-1) ? nz : (long)floor(FR[b] * (double)nz);
-        if (nb[b] < 6) nb[b] = (nz < 6 ? nz : 6);
+        if (nb[b] < 1) nb[b] = 1;
         top[b] = st->z[nb[b] - 1]; }
     double *R = malloc((size_t)NX * K * sizeof(double));  // r at each truncation per candidate
     long nfill = 0;                                       // rows [0, nfill) of R are computed
@@ -324,6 +324,8 @@ int loop_run(const loop_opts *o) {
 
     st.kmin = o->kmin;
     st.boxc = -1.0;
+    printf("# zzz --loop: primes derived from zeros (one per line). trajectory on stderr.\n");
+    fflush(stdout);
     if (resume) {
         if (load_state(&st, o->state_path)) return 1;   // restores st.kmin too
         if (o->kmin_set) st.kmin = o->kmin;             // explicit --loop-kmin overrides
@@ -336,15 +338,21 @@ int loop_run(const loop_opts *o) {
             fprintf(stderr, "loop: checkpoint zeros were located with boxc=%.3f; continuing with boxc=%.3f\n",
                     st.boxc, g_boxc);
     } else {
-        long ns = (o->seed_n > 0 && o->seed_n < NSEED) ? o->seed_n : NSEED;
-        if (ns < 6) { fprintf(stderr, "loop: seed must be >= 6 zeros\n"); return 1; }
-        for (long i = 0; i < ns; ++i) z_push(&st, SEED[i]);
-        fprintf(stderr, "loop: seeded with %ld zeros; loop is zeta-free and primality-free\n", ns);
+        long ns = o->seed_n < NSEED ? o->seed_n : NSEED;
+        if (ns > 0) {
+            for (long i = 0; i < ns; ++i) z_push(&st, SEED[i]);
+            fprintf(stderr, "loop: seeded with %ld zeros; loop is zeta-free and primality-free\n", ns);
+        } else {
+            // no seed: 2 is prime because nothing lies strictly between 1 and 2, and method B
+            // over {2} puts gamma_1 at 14.20 (true 14.13; one zero bootstraps anywhere in ~[13, 14.9])
+            p_push(&st, 2); printf("2\n"); st.Xknown = 2;
+            z_push(&st, locate_march(1, &st, 2, 7.0));
+            fprintf(stderr, "loop: no seed zeros: p={2} gives gamma_1=%.4f; loop is zeta-free and primality-free\n",
+                    st.z[0]);
+        }
     }
 
     signal(SIGINT, on_sigint);
-    printf("# zzz --loop: primes derived from zeros (one per line). trajectory on stderr.\n");
-    fflush(stdout);
 
     if (o->declog && !(g_declog = fopen(o->declog, resume ? "a" : "w"))) {
         fprintf(stderr, "loop: cannot write %s\n", o->declog); return 1; }

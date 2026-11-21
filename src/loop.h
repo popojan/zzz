@@ -1,7 +1,8 @@
 // loop.h -- self-paving zeros<->primes bootstrap (zzz --loop).
 //
 // Demonstrates the explicit formula running in a closed loop with NO zeta
-// evaluation and NO primality test: from a finite seed of zero ordinates it
+// evaluation and NO primality test: from no zeros at all (2 is prime by
+// definition; method B over {2} gives gamma_1) or an optional seed it
 // detects primes (Chebyshev psi' signal) and locates more zeros (method-B
 // partial-Euler sum over the discovered primes), alternating until it is
 // interrupted.  It commits x once the zeros reach ~2*pi*x, so the forward
@@ -23,7 +24,7 @@ typedef struct {
     long nmax_zeros;         // safety cap on the zero list [2000000]
     double kmin;             // kappa margin the forward step must keep [5.0]
     int kmin_set;            // user passed --loop-kmin (overrides resumed value)
-    long seed_n;             // use only the first seed_n seed zeros (0 = all)
+    long seed_n;             // start from the first seed_n built-in zeros (0 = none: from p={2})
     long batch;              // zeros per re-detect (smooth streaming) [2000; 0=all]
     int fresh;               // force a fresh start, ignoring any checkpoint
     double boxc;             // forward box-smoothing window w = boxc*gap(t) [0.375; 0 = plain B]

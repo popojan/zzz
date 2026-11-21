@@ -1193,7 +1193,7 @@ static struct argp_option options[] = {
         { "loop-state", 1002, "FILE", 0, "--loop: checkpoint path [zzz-loop.state]"},
         { "loop-nmax", 1003, "N", 0, "--loop: zero-list cap [2000000]"},
         { "loop-kmin", 1004, "K", 0, "--loop: kappa margin the forward step must keep [5.0]"},
-        { "loop-seed", 1007, "N", 0, "--loop: use only the first N built-in seed zeros (min 6)"},
+        { "loop-seed", 1007, "N", 0, "--loop: start from the first N built-in zeros (1..40) instead of from no zeros"},
         { "loop-fresh", 1009, 0, 0, "--loop: force a fresh start, ignoring any existing checkpoint"},
         { "loop-batch", 1010, "N", 0, "--loop: zeros per re-detect for smooth streaming [2000; 0=whole frontier]"},
         { "loop-boxc", 1011, "C", 0, "--loop: forward box-smoothing window w = C*gap(t) [0.375; 0 = plain B]"},
