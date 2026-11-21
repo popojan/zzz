@@ -26,14 +26,15 @@ bool isPP(int x){                                   // perfect power p^m, m>=2 ?
 // truncation height, so near the reach a composite next to a prime can ride a sidelobe.
 float detFire(float x, int nz){
     float lx=log(x), s=0.0, base=1.0 + 1.0/(x - x*x*x), c4=4.0/sqrt(x), v[6];
-    int b=0, nb=nz/2;
+    int b=0, nb=max(nz/2,1);
     for(int k=0;k<NLIM;k++){
         if(k>=nz) break;
         float zk=texelFetch(iChannel0, idx2(k),0).r;
         s += pcos(zk*lx);
-        if(k+1==nb){
+        for(int q=0;q<6;q++){                               // sizes coincide while nz is small
+            if(b>=6 || k+1!=nb) break;
             v[b]=(base - c4*s)/peakf(x, zk);
-            b++; nb = (b==5) ? nz : int(floor((0.5+0.1*float(b))*float(nz)));
+            b++; nb = (b==5) ? nz : max(int(floor((0.5+0.1*float(b))*float(nz))),1);
         }
     }
     for(int i=1;i<6;i++){ float t=v[i]; int j=i-1;            // insertion sort
@@ -83,12 +84,11 @@ void mainImage(out vec4 O, in vec2 F){
     ivec2 P=ivec2(F);
     int i = P.x + P.y*STRIDE;
 
-    if(iFrame==0){                                          // seed the state
-        float zr=0.0, gi=0.0, b=0.0, a=0.0;
-        if(i<NSEED) zr=seed(i);
-        if(i==0){ b=float(NSEED); a=1.0; }                  // nz=40, Xknown=1
+    if(iFrame==0){                     // no zeros: 2 is prime (nothing lies between 1 and 2)
+        float gi = (i==2) ? 1.0 : 0.0, b=0.0, a=0.0;
+        if(i==0){ b=0.0; a=2.0; }                           // nz=0, Xknown=2
         else if(i==1){ b=KFIX; a=0.0; }                     // kmin=5, iter=0
-        O=vec4(zr,gi,b,a); return;
+        O=vec4(0.0,gi,b,a); return;
     }
 
     vec4 c0=texelFetch(iChannel0, idx2(0),0);
@@ -99,11 +99,11 @@ void mainImage(out vec4 O, in vec2 F){
     // ---- plan this frame (deterministic; every texel computes the same plan) ----
     // decide x only where the LOWEST truncation still resolves unit spacing; below about
     // gamma(nz/2) = 1.8*x a composite between twin primes reads as a prime
-    int reach=int(texelFetch(iChannel0, idx2(nz/2-1),0).r/UMIN);
+    int reach = nz==0 ? Xknown : int(texelFetch(iChannel0, idx2(max(nz/2,1)-1),0).r/UMIN);
     int new_X=Xknown+BAND; if(new_X>reach)new_X=reach; if(new_X<Xknown)new_X=Xknown;
     int new_nz=nz;
-    if(new_X>=8){
-        int tgt=nz+BATCH, nfr=nFrontier(new_X,kmin);
+    {   // license only the zeros the primes in use (<= Xknown) support; gamma_1 always
+        int tgt=nz+BATCH, nfr=max(nFrontier(Xknown,kmin),1);
         if(tgt>nfr)tgt=nfr; if(tgt>NLIM)tgt=NLIM;
         if(tgt>nz) new_nz=tgt;          // only ever GROW the zero list (never regress)
     }

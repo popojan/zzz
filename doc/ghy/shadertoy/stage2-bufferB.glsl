@@ -22,7 +22,8 @@ void mainImage(out vec4 O, in vec2 F){
     int nz = int(texelFetch(iChannel0, idx2(0),0).b + 0.5);
     // enough zeros to resolve THIS window, so the trace's spikes clear the threshold
     // wherever the window sits. Scales with depth, so you only pay for what you're viewing.
-    int n = int(2.8*xHi) + 128; if(n>nz) n=nz; if(n<8) n=8;
+    int n = int(2.8*xHi) + 128; if(n>nz) n=nz;
+    if(n<1){ O = vec4(0.0, float(pc), xLo, xHi); return; }   // frame 1: no zeros yet
     float x = xLo + (xHi-xLo) * (F.x / iResolution.x);   // this column's number-line position
     // .r = the trace r(x); .gba = the (pixel-independent) window, so the Image pass
     // reads pc/xLo/xHi from one texel instead of re-running primeWindow per pixel.

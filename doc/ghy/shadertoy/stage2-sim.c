@@ -6,8 +6,8 @@
 //   ./stage2-sim [NLIM=8000] [old]
 //
 // "old" replays the tabs as published before 2026-11 (one full-NZ reading against the Li
-// envelope at 0.30, reach = nz/2.7, plain method B): 12 composites flagged up to 2962, the
-// first at 417.  Keep this file in step with the two tabs when either changes.
+// envelope at 0.30, reach = nz/2.7, plain method B, 40 seed zeros): 12 composites flagged up
+// to 2962, the first at 417.  The current tabs start from no zeros, with 2 marked prime.  Keep this file in step with the two tabs when either changes.
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,7 +17,7 @@
 #define TWO_PI 6.28318530717959f
 static const float DTAU = 0.40f, UMIN = 3.0f, BOXC = 0.375f, KFIX = 5.0f;
 static const int   BATCH = 12, BAND = 4;
-static const float SEED[40] = {
+static const float SEED[40] = {          // "old" only: the published tabs start from these
     14.134725,21.022040,25.010858,30.424876,32.935062,37.586178,40.918719,43.327073,
     48.005151,49.773832,52.970321,56.446248,59.347044,60.831779,65.112544,67.079811,
     69.546402,72.067158,75.704691,77.144840,79.337375,82.910381,84.735493,87.425275,
@@ -58,12 +58,13 @@ static int isPP(int x) {
 static float detFire(float x, int nz) {
     float lx = logf(x), s = 0.0f, base = 1.0f + 1.0f/(x - x*x*x), c4 = 4.0f/sqrtf(x), v[6];
     if (OLD) { for (int k = 0; k < NLIM && k < nz; k++) s += pcos(Z[k]*lx); return (base - c4*s)/envf_old(x, nz); }
-    int b = 0, nb = nz/2;
+    int b = 0, nb = nz/2 > 0 ? nz/2 : 1;
     for (int k = 0; k < NLIM; k++) {
         if (k >= nz) break;
         float zk = Z[k];
         s += pcos(zk*lx);
-        if (k + 1 == nb) { v[b] = (base - c4*s)/peakf(x, zk); b++; nb = (b == 5) ? nz : (int)floorf((0.5f + 0.1f*(float)b)*(float)nz); }
+        while (b < 6 && k + 1 == nb) { v[b] = (base - c4*s)/peakf(x, zk); b++;
+            nb = (b == 5) ? nz : (int)floorf((0.5f + 0.1f*(float)b)*(float)nz); if (nb < 1) nb = 1; }
     }
     for (int i = 1; i < 6; i++) { float t = v[i]; int j = i - 1; while (j >= 0 && v[j] > t) { v[j+1] = v[j]; j--; } v[j+1] = t; }
     return 0.5f*(v[2] + v[3]);
@@ -100,13 +101,19 @@ int main(int argc, char **argv) {
     if (argc > 2) OLD = !strcmp(argv[2], "old");
     Z = calloc(NLIM + 16, sizeof(float)); G = calloc(NLIM + 16, 1);
     float *rlog = calloc(NLIM + 16, sizeof(float));
-    memcpy(Z, SEED, sizeof SEED);
-    int nz = 40, Xknown = 1, idle = 0; long frames = 0;
+    int nz = 0, Xknown = 2, idle = 0; long frames = 0;
+    if (OLD) { memcpy(Z, SEED, sizeof SEED); nz = 40; Xknown = 1; } else G[2] = 1;
     for (;; ++frames) {
-        int reach = OLD ? (int)((float)nz/2.7f) : (int)(Z[nz/2 - 1]/UMIN);
+        int reach = OLD ? (int)((float)nz/2.7f) : nz == 0 ? Xknown : (int)(Z[(nz/2 > 0 ? nz/2 : 1) - 1]/UMIN);
         int new_X = Xknown + BAND; if (new_X > reach) new_X = reach; if (new_X < Xknown) new_X = Xknown;
         int new_nz = nz;
-        if (new_X >= 8) { int tgt = nz + BATCH, nfr = nFrontier(new_X, KFIX); if (tgt > nfr) tgt = nfr; if (tgt > NLIM) tgt = NLIM; if (tgt > nz) new_nz = tgt; }
+        if (OLD ? new_X >= 8 : 1) {
+            int nfr = OLD ? nFrontier(new_X, KFIX) : nFrontier(Xknown, KFIX), tgt = nz + BATCH;
+            if (nfr < 1) nfr = 1;
+            if (tgt > nfr) tgt = nfr;
+            if (tgt > NLIM) tgt = NLIM;
+            if (tgt > nz) new_nz = tgt;
+        }
         float zn[16]; char gn[8];
         #pragma omp parallel for
         for (int i = nz; i < new_nz; i++) zn[i - nz] = locateSmooth(i + 1, Xknown, KFIX);

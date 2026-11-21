@@ -21,19 +21,7 @@ const float BOXC = 0.375;    // forward box-smoothing window, in mean gaps (0 = 
 const int   STRIDE = 256;    // texels per row of state
 const int   ZBASE  = 0;      // zeros start at linear index 0 (.r channel)
 const int   NZMAX  = 60000;  // zero-list cap
-const int   NSEED  = 40;
 const float KFIX   = 5.0;    // kappa margin (fixed; over-supplied, robust)
-
-// first 40 nontrivial ordinates (the finite seed; not part of the claim)
-float seed(int i){
-    float s[40] = float[](
-    14.134725,21.022040,25.010858,30.424876,32.935062,37.586178,40.918719,43.327073,
-    48.005151,49.773832,52.970321,56.446248,59.347044,60.831779,65.112544,67.079811,
-    69.546402,72.067158,75.704691,77.144840,79.337375,82.910381,84.735493,87.425275,
-    88.809111,92.491899,94.651344,95.870634,98.831194,101.317851,103.725538,105.446623,
-    107.168611,111.029536,111.874659,114.320221,116.226680,118.790783,121.370125,122.946829);
-    return s[i];
-}
 
 ivec2 idx2(int i){ return ivec2(i % STRIDE, i / STRIDE); }
 
