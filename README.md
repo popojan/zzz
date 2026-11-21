@@ -107,7 +107,8 @@ real    0m12.7s
 The explicit formula runs *both* ways: primes → zeros (what every counter above
 does) and zeros → primes (the Chebyshev $\psi'$ comb peaks at prime powers — the
 panel near the end of this README shows the reconstruction). `--loop` closes the
-loop and lets it run unattended: from a finite seed of zero ordinates it detects
+loop and lets it run unattended: from no zeros at all (2 is prime by definition, and
+method B over $\{2\}$ gives $\gamma_1$) it detects
 primes from the $\psi'$ signal, locates more zeros from a method-B sum over
 *those* primes, and repeats — with **no $\zeta$ evaluation and no primality
 test** in the loop body. The loop never confirms its own primes (that would
@@ -117,7 +118,7 @@ Ctrl+C-able.
 
 ```bash
 $ ./zzz --loop | head     # primes derived from zeros; Ctrl+C anytime, rerun to resume
-2                         # X_known climbs 54 -> 104 -> 314 -> 1125 -> ... (188 primes, all correct)
+2                         # X_known climbs 5 -> 10 -> 27 -> 92 -> 418 -> 730 -> ... (all correct)
 3
 5
 ...
@@ -132,7 +133,7 @@ candidate is read against the peak height the loop's own top zero implies. Measu
 them: [`doc/notes/loop-margins.md`](doc/notes/loop-margins.md); mechanism, history
 and seed limits: [`doc/notes/zeros-primes-bootstrap.md`](doc/notes/zeros-primes-bootstrap.md).
 
-**Live GPU demo.** The whole loop runs in-shader (fp32, 40-zero seed, no sieve,
+**Live GPU demo.** The whole loop runs in-shader (fp32, no seed zeros, no sieve,
 no ζ) on Shadertoy: <https://www.shadertoy.com/view/s3BSzD> — source and setup
 under [`doc/ghy/shadertoy/`](doc/ghy/shadertoy/). (The tabs in the repo were corrected in
 2026-11 — the published copy flags a few composites, the first at 417, until they are

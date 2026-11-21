@@ -58,11 +58,13 @@ The same 25-minute run in the other variants, last bin ($x\approx1.6$–$4\times
 
 | variant | reached | primes: mean ± sd (min) | composites: sd (max) | distance to 0.40 | $\alpha$ |
 |---|---|---|---|---|---|
-| default (box-B) | 36 763 | 0.831 ± 0.031 (0.726) | 0.064 (0.159) | 7.1σ | 2.5 |
+| box-B, 40 seed zeros | 36 763 | 0.831 ± 0.031 (0.726) | 0.064 (0.159) | 7.1σ | 2.5 |
 | `--loop-seed 6` | 36 762 | 0.831 ± 0.031 (0.736) | 0.064 (0.128) | 7.2σ | 2.5 |
 | `--loop-boxc 0` (plain B) | 41 597 | 0.702 ± 0.053 (0.530) | 0.072 (0.233) | 6.1σ | 1.8 |
 
-All three lists are exactly the primes. Plain B has the thinner margin throughout (and one
+All three lists are exactly the primes. These runs predate the seedless default (2026-11-21:
+no seed zeros, $\gamma_1$ from method B over $\{2\}$); the 6- and 40-zero rows already agree to
+three digits here, so the start has washed out by this height. Plain B has the thinner margin throughout (and one
 ambiguous stop); the older 2.7M-zero plain-B checkpoint, read with the former Li scale,
 gave $0.68\pm0.047$ and $6.8\sigma$ at $x\approx2.5\times10^5$.
 
@@ -157,8 +159,8 @@ above, not a self-check.
 Both speed-ups leave checkpoints byte-identical. Per iteration at $X=3.5\times10^4$
 ($3\times10^5$ zeros, one core): backward 7.2 s → 0.8 s, forward 22.3 s → 9.5 s. Note
 the forward step is the larger part at these heights; the backward part only overtakes
-it near $\log X\approx16$. `smoke.loop` in `ctest` checks that the default, plain-B,
-and 6-zero-seed variants emit exactly the primes.
+it near $\log X\approx16$. `smoke.loop` in `ctest` checks that the default (no seed zeros),
+plain-B, and 6- and 40-zero-seed variants emit exactly the primes.
 
 Not done, because they change low-order bits and would need re-validation: a
 derivative-based root step in place of bisection (~5 evaluations instead of ~35), and an

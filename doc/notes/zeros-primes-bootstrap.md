@@ -154,12 +154,21 @@ prime-power delta into a Dirichlet-kernel peak of height $\propto\gamma_n\log x/
 $\mathrm{Li}(n)\approx\gamma_n/2\pi$). The naive textbook detector $\int\psi'=\Lambda$ *fails* under
 truncation (the uncancelled $+1$ baseline), so the matched-filter normalisation is doing real work.
 
-**Minimum seed.** The pure "1 zero + {2,3}" is below the floor: one zero is a single cosine and
-locates no prime; the explicit-formula sum needs a *handful* (~6) to resolve even x=2,3. A small
-seed must also not be over-read: six zeros ($\gamma\le37.6$) resolve only $x\lesssim15$, and until
-2026-11 the small-$x$ branch had no such limit (`--loop-seed 6` emitted 18, 22, 24, …). The lag
-floor $\gamma(0.5\,N_Z)\ge2.5\,x$ now applies at every $x$. So the irreducible seed is "~6 zeros",
-with the peak scale read off the zeros themselves.
+**No seed (2026-11-21).** The loop needs no seed zeros. 2 is prime because nothing lies strictly
+between 1 and 2; method B over $\{2\}$ puts $\gamma_1$ at 14.20 (box) or 14.02 (plain), true
+14.134. That one cosine already reads $x=2,3,5$ at 1.11, 0.98, 0.79 and $x=4$ at $-0.16$ against
+the 0.40 threshold; the lag floor $\gamma(0.5\,N_Z)\ge2.5\,x$ stops it at 5, and $\{2,3,5\}$
+licenses 7 zeros, then 34, 197, 1374, … A single zero placed anywhere in about $[13, 14.9]$
+bootstraps to exactly the primes (frozen; re-locating it each iteration widens that to
+$[11.5, 14.9]$), so $\gamma_1$ from $\{2\}$ sits well inside. The prime-free estimate
+$N_0^{-1}(\tfrac12)=14.52$ is at the edge of that basin, and more $N_0$ estimates make it worse
+(3 or 6 of them emit 10, 10 of them detect nothing): smooth estimates carry no prime information.
+Against the 40-zero table the seedless run trails by about one iteration (exactly the primes to
+4909 vs 5399 after 20) and the zeros agree to 0.08 gap. The earlier claim here, that one zero
+locates no prime and ~6 are irreducible, was wrong; what failed was a clamp to 6 truncation
+zeros, not the signal. `--loop-seed N` (1..40) keeps the table start. *History:* the lag floor
+was added in 2026-11 because the small-$x$ branch had no reach limit (`--loop-seed 6` emitted
+18, 22, 24, …).
 
 **Verdict (prototype, 2026-06).** Informationally consistent and **asymptotically critical**: the loop
 self-paves and the prime bound grows for as long as the zero supply grows, but it
