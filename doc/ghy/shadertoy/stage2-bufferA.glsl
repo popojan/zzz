@@ -7,7 +7,7 @@
  */
 const int BATCH = 12;     // zeros located per frame
 const int BAND  = 4;      // prime frontier advanced per frame
-const int NLIM  = 8000;   // demo zero cap (=> primes to ~3000); raise carefully
+const int NLIM  = 8000;   // demo zero cap (=> primes to 1502 = gamma(NLIM/2)/UMIN); raise carefully
 const int XKMAX = 4096;   // FB prime-scan bound
 
 bool isPP(int x){                                   // perfect power p^m, m>=2 ?
